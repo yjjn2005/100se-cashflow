@@ -162,7 +162,6 @@ const DEFAULTS={
  rent:{amt:300},
  stock:{amt:200,start:2030,growth:0},
  living:{active:1200,late:900,switchAge:85},
- gift:{amount:20000,year:2031},
  assets:{house:23,rent:25,farm:15,irp:8,corp:10,stock:10},
  npsDefer:0
 };
@@ -251,10 +250,7 @@ function totalMonthly(y){return SRC.reduce((s,o)=>s+monthly(o.key,y),0);}
 function lifetime(key){return years().reduce((s,y)=>s+monthly(key,y)*12,0);}
 function lifetimeAll(){return SRC.reduce((s,o)=>s+lifetime(o.key),0);}
 function maxMonthly(){return Math.max(...years().map(totalMonthly));}
-function netCashflow(y){return totalMonthly(y)*12-(livingFor(y)*12+(y===S.gift.year?S.gift.amount:0));}
-function giftTax(amount){const base=Math.max(amount-5000,0);let t;
- if(base<=10000)t=base*0.1; else if(base<=50000)t=base*0.2-1000; else if(base<=100000)t=base*0.3-6000;
- else if(base<=300000)t=base*0.4-16000; else t=base*0.5-46000; return {base,tax:Math.max(t,0)};}
+function netCashflow(y){return totalMonthly(y)*12-livingFor(y)*12;}
 function npsAt(d,y){const start=2030+d; if(y<start)return 0; const b=160*(1+0.072*d); return b*Math.pow(1.02,y-start);}
 function npsLifetime(d){let s=0;for(let y=2030+d;y<=Y1;y++)s+=npsAt(d,y)*12;return s;}
 const ASSETS=[{key:'house',name:'주택연금 (거주 아파트)',icon:'🔑',income:'house',note:'66세(2032)~종신 월350만 · 가입자격 사전확인'},
@@ -264,7 +260,7 @@ const ASSETS=[{key:'house',name:'주택연금 (거주 아파트)',icon:'🔑',in
  {key:'corp',name:'법인자금',icon:'🏛️',income:'corp',note:'SCHD 배당 원천 · 법인배당 180만~ 3%증액'},
  {key:'stock',name:'주식 운용',icon:'📈',income:'stock',note:'10억 운용 = 월 200만 (정액)'}];
 function assetSeries(){let r=23.5;const out={};for(const y of years()){
- const inc=totalMonthly(y)*12; const gift=(y===S.gift.year?S.gift.amount:0); const net=inc-(livingFor(y)*12+gift);
+ const inc=totalMonthly(y)*12; const net=inc-livingFor(y)*12;
  r=r*1.03+net/10000; out[y]=r;} return out;}
 
 /* ===================== FORMAT ===================== */
@@ -296,7 +292,7 @@ function renderLight(){
 /* ===================== TABS ===================== */
 const TABS=[{k:'dash',n:'대시보드',i:'📊'},{k:'asset',n:'자산구성표',i:'📦'},{k:'flow',n:'연도별 현금흐름',i:'📅'}]
  .concat(SRC.map(s=>({k:s.key,n:s.name,i:s.icon})))
- .concat([{k:'gift',n:'증여세 계산기',i:'🎁'},{k:'calc',n:'수령액 계산기',i:'🧮'}]);
+ .concat([{k:'calc',n:'수령액 계산기',i:'🧮'}]);
 let cur='dash';
 function render(){
  document.getElementById('nav').innerHTML=TABS.map(t=>
@@ -305,12 +301,10 @@ function render(){
  if(cur==='dash')v.innerHTML=dashHTML();
  else if(cur==='asset')v.innerHTML=assetHTML();
  else if(cur==='flow')v.innerHTML=flowHTML();
- else if(cur==='gift')v.innerHTML=giftHTML();
  else if(cur==='calc')v.innerHTML=calcHTML();
  else v.innerHTML=srcHTML(cur);
  mountCharts();
  if(cur==='calc')initCalc();
- if(cur==='gift')giftCalc();
  /* 모든 숫자 input에 클릭 시 전체선택 적용 */
  attachSelectAll();
 }
@@ -551,10 +545,9 @@ function flowWarnings(){
  const deficits=ys.filter(y=>netCashflow(y)<0);
  if(!deficits.length) return '<div style="margin:10px 0;padding:10px 14px;border-radius:10px;background:rgba(70,214,160,.1);border:1px solid rgba(70,214,160,.3);font-size:13px;color:var(--green)">✅ 전 구간 순현금 흑자 — 생활비·증여 완전 충당</div>';
  const rows=deficits.map(y=>{
-  const inc=totalMonthly(y)*12, liv=livingFor(y)*12, gift=(y===S.gift.year?S.gift.amount:0);
+  const inc=totalMonthly(y)*12, liv=livingFor(y)*12;
   const net=netCashflow(y);
-  const reason=y===S.gift.year?`증여 ₩${fmt(gift)}만 일시지출`:
-               y<=2029?'급여 종료 직후 — 주식운용 미개시 구간':'생활비 초과';
+  const reason=y<=2029?'급여 종료 직후 — 주식운용 미개시 구간':'생활비 초과';
   return `<tr><td>${y}년 (${y-BIRTH}세)</td><td class="num neg">${fmt(net)}만</td>
    <td style="text-align:left;font-size:11px;color:var(--sub)">${reason}</td>
    <td style="text-align:left;font-size:11px;color:var(--green)">자산 3%복리로 자동보전</td></tr>`;
@@ -598,43 +591,7 @@ function flowHTML(){
    <tbody>${rows}</tbody></table></div></div>`;
 }
 
-/* ===================== 증여세 ===================== */
-function giftHTML(){
- return `<div class="grid cols-2" style="align-items:start">
-  <div class="card"><div class="panel-h"><div class="ttl"><span class="ico">🎁</span> 증여 조건 입력</div></div>
-   ${inp('증여액 (자녀 1인)','gift.amount',S.gift.amount,'만원')}
-   ${inp('증여 실행연도','gift.year',S.gift.year,'년 · 현금흐름 반영')}
-   <div class="readonly-note">성인 직계비속 공제 <b>₩5,000만 / 10년</b> 적용. 변경 시 연도별 현금흐름의 해당연도 일시지출도 자동 반영됩니다.</div></div>
-  <div class="card"><div class="panel-h"><div class="ttl">💰 증여세 계산 결과</div></div>
-   <div class="bars" id="giftOut"></div></div>
- </div>
- <div class="card"><div class="panel-h"><div class="ttl">📊 증여세율 (누진세율)</div></div>
-  <table><thead><tr><th>과세표준</th><th>세율</th><th>누진공제(만원)</th></tr></thead><tbody>
-   <tr><td>1억원 이하</td><td class="num">10%</td><td class="num">0</td></tr>
-   <tr><td>1억~5억</td><td class="num">20%</td><td class="num">1,000</td></tr>
-   <tr><td>5억~10억</td><td class="num">30%</td><td class="num">6,000</td></tr>
-   <tr><td>10억~30억</td><td class="num">40%</td><td class="num">16,000</td></tr>
-   <tr><td>30억 초과</td><td class="num">50%</td><td class="num">46,000</td></tr></tbody></table></div>
- <div class="card"><div class="panel-h"><div class="ttl">💡 핵심 절세전략</div></div>
-  <div class="readonly-note" style="line-height:1.9">
-   ① <b>10년 단위 분할증여</b> — ₩5,000만 비과세, 60·70·80대 3회 분산해 누진세율 최소화<br/>
-   ② <b>조기 사전증여</b> — 일찍 증여할수록 향후 자산증식분이 자녀 명의로 이전<br/>
-   ③ <b>손주 세대생략증여</b> — 30% 할증, 장기 상속세 절감 (미성년 공제 ₩2,000만/10년)<br/>
-   ④ <b>부담부증여 검토</b> — 채무 이전 시 증여가액 감소, 단 양도세 발생 → 세무사 상담<br/>
-   ⑤ <b>상속세 연계</b> — 부동산·증권·아파트 합산 규모상 사전증여 선제 대응</div></div>`;
-}
-function giftCalc(){
- const a=S.gift.amount, {base,tax}=giftTax(a), net=a-tax, eff=a>0?tax/a*100:0;
- const items=[['증여액',a,'var(--blue)'],['공제(성인)',5000,'var(--sub)'],['과세표준',base,'var(--gold2)'],
-   ['산출세액',tax,'var(--red)'],['자녀 실수령',net,'var(--green)']];
- const mx=Math.max(a,1);
- document.getElementById('giftOut').innerHTML=
-  `<div class="calc-out"><div class="big" style="color:var(--red)">${fmt(tax)} <small>만원</small></div>
-   <div class="age">산출 증여세 · 실효세율 <b style="color:var(--gold-soft)">${fmt1(eff)}%</b></div></div>`+
-  items.map(([n,v,c])=>`<div class="barrow"><div class="nm">${n}</div>
-   <div class="tr"><div class="fl" style="width:${Math.min(v/mx*100,100)}%;background:${c}"></div></div>
-   <div class="vl">${fmt(v)}만</div></div>`).join('');
-}
+
 
 /* ===================== CHARTS ===================== */
 let charts=[];
