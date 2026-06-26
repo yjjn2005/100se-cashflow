@@ -1,0 +1,21 @@
+{
+  "name": "유재진 100세 캐시플로우",
+  "short_name": "캐시플로우",
+  "description": "연금·배당·임대 종합 자산설계 만60→100세",
+  "start_url": "/100se-cashflow/",
+  "scope": "/100se-cashflow/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#081627",
+  "theme_color": "#D4AF37",
+  "lang": "ko",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["finance", "productivity"],
+  "shortcuts": [
+    { "name": "대시보드", "short_name": "대시보드", "url": "/100se-cashflow/#dash", "description": "전체 수입 현황" },
+    { "name": "현금흐름", "short_name": "현금흐름", "url": "/100se-cashflow/#flow", "description": "연도별 현금흐름" }
+  ]
+}
