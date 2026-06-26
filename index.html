@@ -157,7 +157,7 @@ const BIRTH=1966, Y0=2026, Y1=2066;
 const FIXED={salary:1000, salEnd:2027, farm1:300, farm1End:2036, farm2:220,
  npsBase:160, npsStart:2030, cpi:0.02, house:350, houseStart:2032};
 const DEFAULTS={
- irp:{principal:80000,rate:0.04,amt:396,start:2027,end:2041,amt2:308,start2:2042,end2:2054,amt3:176,start3:2055,end3:2066},
+ irp:{principal:80000,rate:0.04,amt:450,start:2027,end:2046,amt2:106,start2:2047,end2:2056,amt3:64,start3:2057,end3:2066},
  corp:{amt:180,start:2027,growth:0.03},
  rent:{amt:300},
  stock:{amt:200,start:2030,growth:0},
@@ -256,7 +256,7 @@ function npsLifetime(d){let s=0;for(let y=2030+d;y<=Y1;y++)s+=npsAt(d,y)*12;retu
 const ASSETS=[{key:'house',name:'주택연금 (거주 아파트)',icon:'🔑',income:'house',note:'66세(2032)~종신 월350만 · 가입자격 사전확인'},
  {key:'rent',name:'임대부동산',icon:'🏠',income:300,note:'양도세 공제후 · 5인 공동사업자 총 1,100만 (본인 반영 월300만)'},
  {key:'farm',name:'농지연금 부동산',icon:'🌾',income:'farm',note:'감정평가액 · 1기 300만→2기 220만'},
- {key:'irp',name:'IRP 연금',icon:'🏦',income:'irp',note:'원금 8억·연4% 운용 · 61~75세 396만 → 76~88세 308만 → 89~100세 176만 · 100세 소진'},
+ {key:'irp',name:'IRP 연금',icon:'🏦',income:'irp',note:'원금 8억·연4% · 61~80세 450만(고정) → 81~90세 106만 → 91~100세 64만 · 100세 소진'},
  {key:'corp',name:'법인자금',icon:'🏛️',income:'corp',note:'SCHD 배당 원천 · 법인배당 180만~ 3%증액'},
  {key:'stock',name:'주식 운용',icon:'📈',income:'stock',note:'10억 운용 = 월 200만 (정액)'}];
 function assetSeries(){let r=23.5;const out={};for(const y of years()){
@@ -406,14 +406,14 @@ function irpBalancePanel(){
   const m=monthly('irp',y);
   const ann=m*12;
   bal=bal*(1+S.irp.rate)-ann;
-  if([2027,2030,2035,2041,2042,2046,2050,2054,2055,2060,2066].includes(y)||bal<5000)
+  if([2027,2030,2035,2040,2045,2046,2047,2050,2055,2056,2057,2060,2065,2066].includes(y)||bal<5000)
    rows.push({y,age:y-1966,m,ann,bal:Math.round(bal)});
  }
  const tbl=rows.map(r=>`<tr class="${[2041,2054,2066].includes(r.y)?'decade':''}">
   <td>${r.y}</td><td class="num">${r.age}세</td>
   <td class="num">${fmt(r.m)}</td><td class="num">${fmt(r.ann)}</td>
   <td class="num ${r.bal<0?'neg':'pos'}">${fmt(r.bal)}</td>
-  <td style="text-align:left;font-size:11px;color:var(--sub)">${r.y<=S.irp.end?'1구간':r.y<=S.irp.end2?'2구간':'3구간'}</td></tr>`).join('');
+  <td style="text-align:left;font-size:11px;color:var(--sub)">${r.y<=S.irp.end?'1구간(전강·450만)':r.y<=S.irp.end2?'2구간(중간)':'3구간(후약)'}</td></tr>`).join('');
  const chartRows=[];
  let b2=S.irp.principal;
  for(let y=2027;y<=2066;y++){b2=b2*(1+S.irp.rate)-monthly('irp',y)*12; chartRows.push({y,b:Math.max(b2,0)});}
@@ -457,15 +457,15 @@ function editControls(key){
  </div>
  ${inp('원금 총액','irp.principal',S.irp.principal,'만원')}
  ${inp('연 운용수익률 (%)','irp.rate',+(S.irp.rate*100).toFixed(1),'%',true)}
- <div style="margin:12px 0 6px;font-size:12px;font-weight:700;color:var(--gold-soft)">1구간 — 61~75세 (전강)</div>
+ <div style="margin:12px 0 6px;font-size:12px;font-weight:700;color:var(--gold-soft)">1구간 — 61~80세 (전강·고정 450만)</div>
  ${inp('월 인출액','irp.amt',S.irp.amt,'만/월')}
  ${inp('시작연도','irp.start',S.irp.start,'년')}
  ${inp('종료연도','irp.end',S.irp.end,'년')}
- <div style="margin:12px 0 6px;font-size:12px;font-weight:700;color:var(--gold-soft)">2구간 — 76~88세 (중간)</div>
+ <div style="margin:12px 0 6px;font-size:12px;font-weight:700;color:var(--gold-soft)">2구간 — 81~90세 (중간)</div>
  ${inp('월 인출액','irp.amt2',S.irp.amt2,'만/월')}
  ${inp('시작연도','irp.start2',S.irp.start2,'년')}
  ${inp('종료연도','irp.end2',S.irp.end2,'년')}
- <div style="margin:12px 0 6px;font-size:12px;font-weight:700;color:var(--gold-soft)">3구간 — 89~100세 (후약)</div>
+ <div style="margin:12px 0 6px;font-size:12px;font-weight:700;color:var(--gold-soft)">3구간 — 91~100세 (후약)</div>
  ${inp('월 인출액','irp.amt3',S.irp.amt3,'만/월')}
  ${inp('시작연도','irp.start3',S.irp.start3,'년')}
  ${inp('종료연도','irp.end3',S.irp.end3,'년')}
