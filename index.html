@@ -544,6 +544,31 @@ function assetHTML(){
   </tbody></table></div>`;
 }
 
+
+/* 연도별 현금흐름 검증 경고 */
+function flowWarnings(){
+ const ys=years();
+ const deficits=ys.filter(y=>netCashflow(y)<0);
+ if(!deficits.length) return '<div style="margin:10px 0;padding:10px 14px;border-radius:10px;background:rgba(70,214,160,.1);border:1px solid rgba(70,214,160,.3);font-size:13px;color:var(--green)">✅ 전 구간 순현금 흑자 — 생활비·증여 완전 충당</div>';
+ const rows=deficits.map(y=>{
+  const inc=totalMonthly(y)*12, liv=livingFor(y)*12, gift=(y===S.gift.year?S.gift.amount:0);
+  const net=netCashflow(y);
+  const reason=y===S.gift.year?`증여 ₩${fmt(gift)}만 일시지출`:
+               y<=2029?'급여 종료 직후 — 주식운용 미개시 구간':'생활비 초과';
+  return `<tr><td>${y}년 (${y-BIRTH}세)</td><td class="num neg">${fmt(net)}만</td>
+   <td style="text-align:left;font-size:11px;color:var(--sub)">${reason}</td>
+   <td style="text-align:left;font-size:11px;color:var(--green)">자산 3%복리로 자동보전</td></tr>`;
+ }).join('');
+ return `<div style="margin:12px 0 4px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+   <span style="font-size:14px">⚠️</span>
+   <span style="font-size:13px;font-weight:700;color:var(--gold-soft)">순현금 적자 연도 ${deficits.length}개년 — 자산에서 자동 충당</span>
+  </div>
+  <div style="overflow:auto;border-radius:10px;border:1px solid rgba(242,119,107,.25);background:rgba(242,119,107,.06)">
+  <table><thead><tr><th>연도/나이</th><th>순현금</th><th>원인</th><th>처리</th></tr></thead>
+  <tbody>${rows}</tbody></table></div></div>`;
+}
+
 /* ===================== 연도별 현금흐름 ===================== */
 function flowHTML(){
  const ys=years(), assets=assetSeries();
@@ -561,6 +586,7 @@ function flowHTML(){
     ${kpi('적자 발생 연도','blue',deficits+'<small>개년</small>',deficits?'자산수익으로 보전':'전구간 흑자')}
     ${kpi('월 생활비 (활동기)','gold',fmt(S.living.active)+'<small>만</small>','85세↑ '+fmt(S.living.late)+'만')}
    </div>
+   ${flowWarnings()}
    <div class="grid cols-3" style="margin-top:14px">
     ${inp('생활비 활동기 (60~84세)','living.active',S.living.active,'만/월')}
     ${inp('생활비 후기 (85세~)','living.late',S.living.late,'만/월')}
