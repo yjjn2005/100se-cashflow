@@ -157,7 +157,7 @@ const BIRTH=1966, Y0=2026, Y1=2066;
 const FIXED={salary:1000, salEnd:2027, farm1:300, farm1End:2036, farm2:220,
  npsBase:160, npsStart:2030, cpi:0.02, house:350, houseStart:2032};
 const DEFAULTS={
- irp:{amt:400,start:2027,end:2054},
+ irp:{amt:450,start:2027,end:2046,amt2:200,start2:2047,end2:2066},
  corp:{amt:180,start:2027,growth:0.03},
  rent:{amt:300},
  stock:{amt:200,start:2030,growth:0},
@@ -236,7 +236,7 @@ function monthly(key,y){
  switch(key){
   case 'salary': return y<=FIXED.salEnd?FIXED.salary:0;
   case 'farm':   return y<=FIXED.farm1End?FIXED.farm1:FIXED.farm2;
-  case 'irp':    return (y>=S.irp.start&&y<=S.irp.end)?S.irp.amt:0;
+  case 'irp':    return (y>=S.irp.start&&y<=S.irp.end)?S.irp.amt:(y>=S.irp.start2&&y<=S.irp.end2)?S.irp.amt2:0;
   case 'corp':   return y>=S.corp.start?S.corp.amt*Math.pow(1+S.corp.growth,y-S.corp.start):0;
   case 'rent':   return S.rent.amt;
   case 'stock':  return y>=S.stock.start?S.stock.amt*Math.pow(1+S.stock.growth,y-S.stock.start):0;
@@ -256,7 +256,7 @@ function npsLifetime(d){let s=0;for(let y=2030+d;y<=Y1;y++)s+=npsAt(d,y)*12;retu
 const ASSETS=[{key:'house',name:'주택연금 (거주 아파트)',icon:'🔑',income:'house',note:'66세(2032)~종신 월350만 · 가입자격 사전확인'},
  {key:'rent',name:'임대부동산',icon:'🏠',income:300,note:'양도세 공제후 · 5인 공동사업자 총 1,100만 (본인 반영 월300만)'},
  {key:'farm',name:'농지연금 부동산',icon:'🌾',income:'farm',note:'감정평가액 · 1기 300만→2기 220만'},
- {key:'irp',name:'IRP 연금',icon:'🏦',income:'irp',note:'월 400만 인출, 소진까지(~2054)'},
+ {key:'irp',name:'IRP 연금',icon:'🏦',income:'irp',note:'~80세 월 450만 → 81~100세 월 200만'},
  {key:'corp',name:'법인자금',icon:'🏛️',income:'corp',note:'SCHD 배당 원천 · 법인배당 180만~ 3%증액'},
  {key:'stock',name:'주식 운용',icon:'📈',income:'stock',note:'10억 운용 = 월 200만 (정액)'}];
 function assetSeries(){let r=23.5;const out={};for(const y of years()){
@@ -412,9 +412,12 @@ function npsDeferPanel(){
 /* ====== INPUT 헬퍼 — 클릭 시 전체선택은 attachSelectAll()에서 처리 ====== */
 function editControls(key){
  if(key==='irp')return grp([
-   inp('IRP 월 인출액','irp.amt',S.irp.amt,'만/월'),
-   inp('시작 연도','irp.start',S.irp.start,'년'),
-   inp('종료 연도 (소진)','irp.end',S.irp.end,'년')]);
+   inp('IRP 1구간 월 인출액 (~80세)','irp.amt',S.irp.amt,'만/월'),
+   inp('1구간 시작연도','irp.start',S.irp.start,'년'),
+   inp('1구간 종료연도 (80세=2046)','irp.end',S.irp.end,'년'),
+   inp('IRP 2구간 월 인출액 (81세~)','irp.amt2',S.irp.amt2,'만/월'),
+   inp('2구간 시작연도','irp.start2',S.irp.start2,'년'),
+   inp('2구간 종료연도 (100세=2066)','irp.end2',S.irp.end2,'년')]);
  if(key==='corp')return grp([
    inp('법인배당 시작액','corp.amt',S.corp.amt,'만/월'),
    inp('시작 연도','corp.start',S.corp.start,'년'),
@@ -442,7 +445,8 @@ function inp(label,path,val,unit,pct){
 function setVal(path,v,pct){
  v=parseFloat(v); if(isNaN(v))return;
  if(pct)v=v/100;
- const[a,b]=path.split('.'); if(S[a][b]===v)return; // 값 미변경시 스킵
+ const parts=path.split('.');
+ const[a,b]=parts; if(S[a][b]===v)return; // 값 미변경시 스킵
  S[a][b]=v;
  save(true);
  renderLight(); // 차트·KPI만 갱신, input DOM 유지
