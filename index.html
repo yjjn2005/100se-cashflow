@@ -396,45 +396,35 @@ function srcHTML(key){
   <div class="card"><div class="panel-h"><div class="ttl">📋 10년 단위 요약</div></div>
    <table><thead><tr><th>연도</th><th>나이</th><th>월수령(만)</th><th>연수령(만)</th></tr></thead><tbody>${tbl}</tbody></table></div>
  </div>
- ${key==='nps'?npsDeferPanel():''}`;
+ ${key==='nps'?npsDeferPanel():''}${key==='irp'?irpBalancePanel():''}`;
 }
 
-/* IRP 잔액 시뮬레이션 패널 */
+/* IRP 잔액 시뮬레이션 패널 — <script> 제거, mountCharts에서 처리 */
 function irpBalancePanel(){
  let bal=S.irp.principal; const rows=[];
  for(let y=2027;y<=2066;y++){
   const m=monthly('irp',y);
   const ann=m*12;
   bal=bal*(1+S.irp.rate)-ann;
+  const seg=y<=S.irp.end?'1구간(전강·450만)':y<=S.irp.end2?'2구간(중간)':'3구간(후약)';
+  const cls=bal<0?'neg':'pos';
   if([2027,2030,2035,2040,2045,2046,2047,2050,2055,2056,2057,2060,2065,2066].includes(y)||bal<5000)
-   rows.push({y,age:y-1966,m,ann,bal:Math.round(bal)});
+   rows.push({y,age:y-1966,m,ann,bal:Math.round(bal),seg,cls});
  }
- const tbl=rows.map(r=>`<tr class="${[2041,2054,2066].includes(r.y)?'decade':''}">
-  <td>${r.y}</td><td class="num">${r.age}세</td>
-  <td class="num">${fmt(r.m)}</td><td class="num">${fmt(r.ann)}</td>
-  <td class="num ${r.bal<0?'neg':'pos'}">${fmt(r.bal)}</td>
-  <td style="text-align:left;font-size:11px;color:var(--sub)">${r.y<=S.irp.end?'1구간(전강·450만)':r.y<=S.irp.end2?'2구간(중간)':'3구간(후약)'}</td></tr>`).join('');
- const chartRows=[];
- let b2=S.irp.principal;
- for(let y=2027;y<=2066;y++){b2=b2*(1+S.irp.rate)-monthly('irp',y)*12; chartRows.push({y,b:Math.max(b2,0)});}
- return `<div class="sec-title">💰 잔액 시뮬레이션 (연4% 복리 반영) <span class="ln"></span></div>
- <div class="grid cols-2">
-  <div class="card"><div class="panel-h"><div class="ttl">📉 잔액 추이</div></div>
-   <div class="chartbox sm"><canvas id="cIrpBal"></canvas></div></div>
-  <div class="card"><div class="panel-h"><div class="ttl">📋 구간별 잔액 요약</div></div>
-   <table><thead><tr><th>연도</th><th>나이</th><th>월인출</th><th>연인출</th><th>잔액(만)</th><th>구간</th></tr></thead>
-   <tbody>${tbl}</tbody></table></div></div>
- <script>
- (function(){
-  const ctx=document.getElementById('cIrpBal');if(!ctx)return;
-  const ys=${JSON.stringify(chartRows.map(r=>r.y))};
-  const bs=${JSON.stringify(chartRows.map(r=>Math.round(r.b)))};
-  new Chart(ctx,{type:'line',data:{labels:ys,datasets:[{label:'IRP잔액(만)',data:bs,
-   borderColor:'#6FA8FF',backgroundColor:'rgba(111,168,255,.15)',fill:true,pointRadius:0,borderWidth:2,tension:.3}]},
-   options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:9}},
-    y:{grid:{color:'rgba(35,69,110,.4)'},ticks:{callback:v=>Math.round(v/10000)+'억'}}}}});
- })();
- </script>`;
+ const tbl=rows.map(function(r){
+  var dc=[2041,2054,2066].includes(r.y)?'decade':'';
+  return '<tr class="'+dc+'"><td>'+r.y+'</td><td class="num">'+r.age+'세</td>'
+   +'<td class="num">'+fmt(r.m)+'</td><td class="num">'+fmt(r.ann)+'</td>'
+   +'<td class="num '+r.cls+'">'+fmt(r.bal)+'</td>'
+   +'<td style="text-align:left;font-size:11px;color:var(--sub)">'+r.seg+'</td></tr>';
+ }).join('');
+ return '<div class="sec-title">💰 잔액 시뮬레이션 (연4% 복리 반영) <span class="ln"></span></div>'
+  +'<div class="grid cols-2">'
+  +'<div class="card"><div class="panel-h"><div class="ttl">📉 잔액 추이</div></div>'
+  +'<div class="chartbox sm"><canvas id="cIrpBal"></canvas></div></div>'
+  +'<div class="card"><div class="panel-h"><div class="ttl">📋 구간별 잔액 요약</div></div>'
+  +'<table><thead><tr><th>연도</th><th>나이</th><th>월인출</th><th>연인출</th><th>잔액(만)</th><th>구간</th></tr></thead>'
+  +'<tbody>'+tbl+'</tbody></table></div></div>';
 }
 
 function npsDeferPanel(){
@@ -450,26 +440,21 @@ function npsDeferPanel(){
 
 /* ====== INPUT 헬퍼 — 클릭 시 전체선택은 attachSelectAll()에서 처리 ====== */
 function editControls(key){
- if(key==='irp')return `<div>
- <div style="margin-bottom:14px;padding:12px 14px;border-radius:11px;background:rgba(111,168,255,.08);border:1px solid rgba(111,168,255,.25);font-size:12px;line-height:1.8;color:var(--sub)">
-  원금 <b style="color:var(--gold-soft)">${fmt(S.irp.principal)}만원 (${fmt1(S.irp.principal/10000)}억)</b> · 연 운용수익률 <b style="color:var(--green)">${(S.irp.rate*100).toFixed(1)}%</b><br/>
-  <span style="color:var(--blue)">전강후약 3구간 · 100세 소진 설계</span>
- </div>
- ${inp('원금 총액','irp.principal',S.irp.principal,'만원')}
- ${inp('연 운용수익률 (%)','irp.rate',+(S.irp.rate*100).toFixed(1),'%',true)}
- <div style="margin:12px 0 6px;font-size:12px;font-weight:700;color:var(--gold-soft)">1구간 — 61~80세 (전강·고정 450만)</div>
- ${inp('월 인출액','irp.amt',S.irp.amt,'만/월')}
- ${inp('시작연도','irp.start',S.irp.start,'년')}
- ${inp('종료연도','irp.end',S.irp.end,'년')}
- <div style="margin:12px 0 6px;font-size:12px;font-weight:700;color:var(--gold-soft)">2구간 — 81~90세 (중간)</div>
- ${inp('월 인출액','irp.amt2',S.irp.amt2,'만/월')}
- ${inp('시작연도','irp.start2',S.irp.start2,'년')}
- ${inp('종료연도','irp.end2',S.irp.end2,'년')}
- <div style="margin:12px 0 6px;font-size:12px;font-weight:700;color:var(--gold-soft)">3구간 — 91~100세 (후약)</div>
- ${inp('월 인출액','irp.amt3',S.irp.amt3,'만/월')}
- ${inp('시작연도','irp.start3',S.irp.start3,'년')}
- ${inp('종료연도','irp.end3',S.irp.end3,'년')}
-</div>`;
+ if(key==='irp'){
+ var irpInfo='<div style="margin-bottom:14px;padding:12px 14px;border-radius:11px;background:rgba(111,168,255,.08);border:1px solid rgba(111,168,255,.25);font-size:12px;line-height:1.8;color:var(--sub)">'
+  +'원금 <b style="color:var(--gold-soft)">'+fmt(S.irp.principal)+'만원 ('+fmt1(S.irp.principal/10000)+'억)</b> · 연 운용수익률 <b style="color:var(--green)">'+(S.irp.rate*100).toFixed(1)+'%</b><br/>'
+  +'<span style="color:var(--blue)">전강후약 3구간 · 100세 소진 설계</span></div>';
+ var h1='<div style="margin:12px 0 6px;font-size:12px;font-weight:700;color:var(--gold-soft)">1구간 — 61~80세 (전강·고정 450만)</div>';
+ var h2='<div style="margin:12px 0 6px;font-size:12px;font-weight:700;color:var(--gold-soft)">2구간 — 81~90세 (중간)</div>';
+ var h3='<div style="margin:12px 0 6px;font-size:12px;font-weight:700;color:var(--gold-soft)">3구간 — 91~100세 (후약)</div>';
+ return '<div>'+irpInfo
+  +inp('원금 총액','irp.principal',S.irp.principal,'만원')
+  +inp('연 운용수익률 (%)','irp.rate',+(S.irp.rate*100).toFixed(1),'%',true)
+  +h1+inp('월 인출액','irp.amt',S.irp.amt,'만/월')+inp('시작연도','irp.start',S.irp.start,'년')+inp('종료연도','irp.end',S.irp.end,'년')
+  +h2+inp('월 인출액','irp.amt2',S.irp.amt2,'만/월')+inp('시작연도','irp.start2',S.irp.start2,'년')+inp('종료연도','irp.end2',S.irp.end2,'년')
+  +h3+inp('월 인출액','irp.amt3',S.irp.amt3,'만/월')+inp('시작연도','irp.start3',S.irp.start3,'년')+inp('종료연도','irp.end3',S.irp.end3,'년')
+  +'</div>';
+}
  if(key==='corp')return grp([
    inp('법인배당 시작액','corp.amt',S.corp.amt,'만/월'),
    inp('시작 연도','corp.start',S.corp.start,'년'),
@@ -670,7 +655,22 @@ function mountCharts(){
     options:{plugins:{legend:{display:false}},interaction:{mode:'index',intersect:false},
      scales:{x:{stacked:true,grid:{display:false},ticks:{maxTicksLimit:9}},
              y:{stacked:true,grid:{color:'rgba(35,69,110,.4)'},title:{display:true,text:'만원/월'}}}}}));
- } else if(SRC.find(s=>s.key===cur)){
+ } else if(cur==='irp'){
+  const o=SRC.find(s=>s.key==='irp');
+  charts.push(new Chart(cSrc,{type:'bar',data:{labels:ys,
+    datasets:[{label:o.name,data:ys.map(y=>Math.round(monthly(o.key,y))),backgroundColor:o.color+'cc',borderColor:o.color,borderRadius:3}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:9}},
+      y:{grid:{color:'rgba(35,69,110,.4)'},title:{display:true,text:'만원/월'}}}}}));
+  // IRP 잔액 차트
+  const irpRows=[];let ib=S.irp.principal;
+  for(const y of ys){ib=ib*(1+S.irp.rate)-monthly('irp',y)*12;irpRows.push({y,b:Math.max(ib,0)});}
+  const cIrpBalEl=document.getElementById('cIrpBal');
+  if(cIrpBalEl) charts.push(new Chart(cIrpBalEl,{type:'line',data:{labels:irpRows.map(r=>r.y),
+    datasets:[{label:'IRP잔액(만)',data:irpRows.map(r=>Math.round(r.b)),
+     borderColor:'#6FA8FF',backgroundColor:'rgba(111,168,255,.15)',fill:true,pointRadius:0,borderWidth:2,tension:.3}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:9}},
+      y:{grid:{color:'rgba(35,69,110,.4)'},ticks:{callback:function(v){return Math.round(v/10000)+'억';}}}}}}));
+} else if(SRC.find(s=>s.key===cur)){
   const o=SRC.find(s=>s.key===cur);
   charts.push(new Chart(cSrc,{type:'bar',data:{labels:ys,
     datasets:[{label:o.name,data:ys.map(y=>Math.round(monthly(o.key,y))),backgroundColor:o.color+'cc',borderColor:o.color,borderRadius:3}]},
