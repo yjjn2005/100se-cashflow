@@ -27,6 +27,14 @@ header{padding:26px 0 14px;display:flex;align-items:center;justify-content:space
 .brand .sub{font-size:12px;color:var(--sub);margin-top:2px}
 .asof{font-size:12px;color:var(--sub);text-align:right}
 .asof b{color:var(--gold-soft)}
+/* Sync badge */
+.sync-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;
+ padding:4px 10px;border-radius:999px;background:rgba(70,214,160,.12);color:var(--green);
+ border:1px solid rgba(70,214,160,.3);transition:.3s}
+.sync-badge.syncing{background:rgba(212,175,55,.16);color:var(--gold-soft);border-color:rgba(212,175,55,.4)}
+.sync-badge .dot-live{width:7px;height:7px;border-radius:50%;background:var(--green);
+ animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
 /* Tabs */
 nav{display:flex;gap:7px;overflow-x:auto;padding:8px 0 14px;scrollbar-width:thin;position:sticky;top:0;z-index:20;
  background:linear-gradient(var(--navy),rgba(8,22,39,.86));backdrop-filter:blur(6px)}
@@ -59,13 +67,21 @@ nav::-webkit-scrollbar{height:6px}nav::-webkit-scrollbar-thumb{background:#1d3c6
 .badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px}
 .badge.fix{background:rgba(111,168,255,.14);color:var(--blue);border:1px solid rgba(111,168,255,.35)}
 .badge.edit{background:rgba(212,175,55,.14);color:var(--gold-soft);border:1px solid rgba(212,175,55,.4)}
-/* inputs */
-.field{margin-bottom:13px}
+/* ====== INPUT — 클릭시 전체선택 스타일 ====== */
+.field{margin-bottom:13px;position:relative}
 .field label{display:block;font-size:12px;color:var(--sub);font-weight:600;margin-bottom:5px}
-.field input{width:100%;padding:11px 13px;border-radius:11px;border:1px solid var(--line);
- background:var(--navy);color:var(--ink);font-size:15px;font-weight:700;font-family:inherit;transition:.15s}
-.field input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,55,.16)}
-.field input:disabled{color:var(--sub);background:#0a1d33;font-weight:600;cursor:not-allowed}
+.field input[type=number]{width:100%;padding:11px 13px;border-radius:11px;border:1.5px solid var(--line);
+ background:var(--navy);color:var(--ink);font-size:15px;font-weight:700;font-family:inherit;
+ transition:.15s;cursor:pointer;-moz-appearance:textfield}
+.field input[type=number]::-webkit-inner-spin-button,
+.field input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.field input[type=number]:focus{outline:none;border-color:var(--gold);
+ box-shadow:0 0 0 3px rgba(212,175,55,.22);background:#0d2040;cursor:text}
+.field input[type=number]:disabled{color:var(--sub);background:#0a1d33;font-weight:600;cursor:not-allowed}
+/* edit icon hint */
+.field .edit-hint{position:absolute;right:13px;top:50%;transform:translateY(-50%);
+ margin-top:10px;font-size:14px;opacity:.35;pointer-events:none;transition:.2s}
+.field:focus-within .edit-hint{opacity:0}
 .field .unit{font-size:11px;color:var(--sub);margin-top:4px}
 .readonly-note{font-size:12px;color:var(--sub);line-height:1.6;background:var(--navy);border:1px dashed var(--line);
  border-radius:11px;padding:12px 14px}
@@ -106,6 +122,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
  border:1px solid rgba(212,175,55,.3);border-radius:999px;padding:3px 10px;margin-left:6px}
 .reset{font-size:12px;color:var(--sub);background:none;border:1px solid var(--line);border-radius:9px;padding:7px 12px;cursor:pointer}
 .reset:hover{color:var(--ink);border-color:var(--gold)}
+/* toast */
+#toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);
+ background:rgba(70,214,160,.18);border:1px solid rgba(70,214,160,.5);
+ backdrop-filter:blur(12px);color:var(--green);font-size:13px;font-weight:700;
+ padding:10px 22px;border-radius:999px;z-index:999;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
@@ -116,7 +138,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
    <div><h1>유재진 100세 캐시플로우</h1>
     <div class="sub">연금 · 배당 · 임대 종합 자산설계 &nbsp;|&nbsp; 만 60 → 100세 (2026–2066)</div></div>
   </div>
-  <div class="asof">기준일 <b>2026.06.26</b><br/>단위 만원/월 (세후)</div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+   <div class="asof">기준일 <b>2026.06.26</b>&nbsp; 단위 만원/월 (세후)</div>
+   <div class="sync-badge" id="syncBadge"><span class="dot-live"></span><span id="syncTxt">실시간 동기화 ON</span></div>
+  </div>
  </header>
  <nav id="nav"></nav>
  <div id="view"></div>
@@ -125,6 +150,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   © 2026 유재진 자산설계 · 농지·급여·국민·주택연금은 고정(공식), IRP·법인배당·부동산임대·주식운용은 수동입력
  </div>
 </div>
+<div id="toast"></div>
 <script>
 /* ===================== MODEL ===================== */
 const BIRTH=1966, Y0=2026, Y1=2066;
@@ -141,11 +167,62 @@ const DEFAULTS={
  npsDefer:0
 };
 let S=load();
-function load(){try{const v=JSON.parse(localStorage.getItem('jjcf'));if(v&&v.irp)return v;}catch(e){}
- return JSON.parse(JSON.stringify(DEFAULTS));}
-function save(){localStorage.setItem('jjcf',JSON.stringify(S));}
-function reset(){S=JSON.parse(JSON.stringify(DEFAULTS));save();render();}
 
+/* ===================== STORAGE + SYNC ===================== */
+const STORE_KEY='jjcf';
+const BC_KEY='jjcf_bc';
+
+function load(){
+ try{const v=JSON.parse(localStorage.getItem(STORE_KEY));if(v&&v.irp)return v;}catch(e){}
+ return JSON.parse(JSON.stringify(DEFAULTS));
+}
+function save(broadcast=true){
+ localStorage.setItem(STORE_KEY,JSON.stringify(S));
+ if(broadcast && window._bc){
+  try{ window._bc.postMessage({type:'update',data:S,ts:Date.now()}); }catch(e){}
+ }
+}
+function reset(){S=JSON.parse(JSON.stringify(DEFAULTS));save();render();showToast('기본값으로 복원됐습니다');}
+
+/* BroadcastChannel — 같은 origin의 모든 탭/창에 즉시 전파 */
+function initSync(){
+ if(!window.BroadcastChannel){
+  document.getElementById('syncTxt').textContent='동기화 미지원 브라우저';
+  return;
+ }
+ const bc=new BroadcastChannel(BC_KEY);
+ window._bc=bc;
+ bc.onmessage=e=>{
+  if(e.data && e.data.type==='update'){
+   S=e.data.data;
+   flashSync();
+   render();
+  }
+ };
+ /* storage 이벤트 — 다른 탭에서 변경 시(같은 브라우저 다른 탭) */
+ window.addEventListener('storage',e=>{
+  if(e.key===STORE_KEY && e.newValue){
+   try{const v=JSON.parse(e.newValue);if(v&&v.irp){S=v;flashSync();render();}}catch(ex){}
+  }
+ });
+}
+let _flashT;
+function flashSync(){
+ const b=document.getElementById('syncBadge');
+ const t=document.getElementById('syncTxt');
+ if(!b)return;
+ clearTimeout(_flashT);
+ b.classList.add('syncing');
+ t.textContent='데이터 업데이트됨';
+ _flashT=setTimeout(()=>{b.classList.remove('syncing');t.textContent='실시간 동기화 ON';},2000);
+}
+function showToast(msg,dur=2200){
+ const el=document.getElementById('toast');
+ el.textContent=msg; el.classList.add('show');
+ setTimeout(()=>el.classList.remove('show'),dur);
+}
+
+/* ===================== DATA ===================== */
 const SRC=[
  {key:'salary',name:'급여',icon:'💼',fixed:true,color:'#8FA9CE'},
  {key:'farm',name:'농지연금',icon:'🌾',fixed:true,color:'#7FB77E'},
@@ -157,7 +234,6 @@ const SRC=[
  {key:'house',name:'주택연금',icon:'🔑',fixed:true,color:'#F2B36B'},
 ];
 function monthly(key,y){
- const age=y-BIRTH;
  switch(key){
   case 'salary': return y<=FIXED.salEnd?FIXED.salary:0;
   case 'farm':   return y<=FIXED.farm1End?FIXED.farm1:FIXED.farm2;
@@ -172,7 +248,7 @@ function monthly(key,y){
 function livingFor(y){return (y-BIRTH)>=S.living.switchAge?S.living.late:S.living.active;}
 function years(){const a=[];for(let y=Y0;y<=Y1;y++)a.push(y);return a;}
 function totalMonthly(y){return SRC.reduce((s,o)=>s+monthly(o.key,y),0);}
-function lifetime(key){return years().reduce((s,y)=>s+monthly(key,y)*12,0);} // 만원
+function lifetime(key){return years().reduce((s,y)=>s+monthly(key,y)*12,0);}
 function lifetimeAll(){return SRC.reduce((s,o)=>s+lifetime(o.key),0);}
 function maxMonthly(){return Math.max(...years().map(totalMonthly));}
 function netCashflow(y){return totalMonthly(y)*12-(livingFor(y)*12+(y===S.gift.year?S.gift.amount:0));}
@@ -187,17 +263,19 @@ const ASSETS=[{key:'house',name:'주택연금 (거주 아파트)',icon:'🔑',in
  {key:'irp',name:'IRP 연금',icon:'🏦',income:'irp',note:'월 400만 인출, 소진까지(~2054)'},
  {key:'corp',name:'법인자금',icon:'🏛️',income:'corp',note:'SCHD 배당 원천 · 법인배당 180만~ 3%증액'},
  {key:'stock',name:'주식 운용',icon:'📈',income:'stock',note:'10억 운용 = 월 200만 (정액)'}];
-/* cumulative asset (3% + net cashflow), start 23.5억 */
 function assetSeries(){let r=23.5;const out={};for(const y of years()){
  const inc=totalMonthly(y)*12; const gift=(y===S.gift.year?S.gift.amount:0); const net=inc-(livingFor(y)*12+gift);
  r=r*1.03+net/10000; out[y]=r;} return out;}
+
 /* ===================== FORMAT ===================== */
 const fmt=n=>Math.round(n).toLocaleString('ko-KR');
 const fmt1=n=>(Math.round(n*10)/10).toLocaleString('ko-KR',{minimumFractionDigits:1,maximumFractionDigits:1});
 const eok=man=>fmt1(man/10000);
 
 /* ===================== TABS ===================== */
-const TABS=[{k:'dash',n:'대시보드',i:'📊'},{k:'asset',n:'자산구성표',i:'📦'},{k:'flow',n:'연도별 현금흐름',i:'📅'}].concat(SRC.map(s=>({k:s.key,n:s.name,i:s.icon}))).concat([{k:'gift',n:'증여세 계산기',i:'🎁'},{k:'calc',n:'수령액 계산기',i:'🧮'}]);
+const TABS=[{k:'dash',n:'대시보드',i:'📊'},{k:'asset',n:'자산구성표',i:'📦'},{k:'flow',n:'연도별 현금흐름',i:'📅'}]
+ .concat(SRC.map(s=>({k:s.key,n:s.name,i:s.icon})))
+ .concat([{k:'gift',n:'증여세 계산기',i:'🎁'},{k:'calc',n:'수령액 계산기',i:'🧮'}]);
 let cur='dash';
 function render(){
  document.getElementById('nav').innerHTML=TABS.map(t=>
@@ -212,8 +290,28 @@ function render(){
  mountCharts();
  if(cur==='calc')initCalc();
  if(cur==='gift')giftCalc();
+ /* 모든 숫자 input에 클릭 시 전체선택 적용 */
+ attachSelectAll();
 }
 function go(k){cur=k;window.scrollTo(0,0);render();}
+
+/* ====== 클릭 시 전체선택 ====== */
+function attachSelectAll(){
+ document.querySelectorAll('.field input[type=number]').forEach(el=>{
+  el.removeEventListener('focus',_onFocus);
+  el.addEventListener('focus',_onFocus);
+  el.removeEventListener('click',_onClick);
+  el.addEventListener('click',_onClick);
+ });
+}
+function _onFocus(e){
+ /* 모바일 / 데스크탑 모두: 포커스 시 전체선택 */
+ setTimeout(()=>{try{e.target.select();}catch(x){}},0);
+}
+function _onClick(e){
+ /* 이미 포커스 상태에서 재클릭해도 전체선택 */
+ try{e.target.select();}catch(x){}
+}
 
 /* ===================== DASHBOARD ===================== */
 function dashHTML(){
@@ -245,7 +343,7 @@ function dashHTML(){
    return `<tr><td><i class="dot" style="background:${o.color}"></i> ${o.name}</td>
    <td style="text-align:left"><span class="badge ${o.fixed?'fix':'edit'}">${o.fixed?'고정':'수정가능'}</span></td>
    <td class="num">${eok(o.life)}</td><td class="num">${fmt1(o.life/lifeAll*100)}%</td>
-   <td class="num">${fmt(mx)}</td></tr>`}).join('')}
+   <td class="num">${fmt(mx)}</td></tr>`;}).join('')}
  <tr style="border-top:2px solid var(--gold)"><td><b>합계</b></td><td></td><td class="num"><b style="color:var(--gold-soft)">${eok(lifeAll)}</b></td><td class="num">100%</td><td></td></tr>
  </tbody></table></div>`;
 }
@@ -260,7 +358,6 @@ function srcHTML(key){
  let ctrl;
  if(!o.fixed){ ctrl=editControls(key); }
  else{ ctrl=`<div class="readonly-note">${fixedNote(key)}</div>`; }
- // decade table
  const decs=[2026,2030,2036,2040,2046,2050,2056,2060,2066];
  const tbl=decs.map(y=>`<tr class="${(y-BIRTH)%10===0?'decade':''}"><td>${y}</td><td class="num">${y-BIRTH}세</td>
    <td class="num">${fmt(monthly(key,y))}</td><td class="num">${fmt(monthly(key,y)*12)}</td></tr>`).join('');
@@ -296,6 +393,8 @@ function npsDeferPanel(){
    <td style="text-align:left;color:var(--gold-soft)">${r.d===best?'★ 권고 (손익분기 80세)':r.d===0?'즉시수령':''}</td></tr>`).join('')}</tbody></table>
  <div class="readonly-note" style="margin-top:12px">64~68세 구간은 임대·운용·농지·IRP·법인·주식·주택연금 합산으로 생활비를 충분히 상회 → <b>5년 연기(69세 개시)</b> 시 +36% 증액 + 평생 물가연동으로 장수 대비 종신소득 최대화. ※ 본 표는 시뮬레이션이며 본 모델의 국민연금은 2030년 개시(고정) 기준입니다.</div></div>`;
 }
+
+/* ====== INPUT 헬퍼 — 클릭 시 전체선택은 attachSelectAll()에서 처리 ====== */
 function editControls(key){
  if(key==='irp')return grp([
    inp('IRP 월 인출액','irp.amt',S.irp.amt,'만/월'),
@@ -314,12 +413,22 @@ function editControls(key){
  return '';
 }
 function grp(arr){return `<div>${arr.join('')}</div>`;}
-function inp(label,path,val,unit,pct){return `<div class="field"><label>${label}</label>
- <input type="number" step="any" value="${val}" oninput="setVal('${path}',this.value,${pct?1:0})"/>
- <div class="unit">${unit}</div></div>`;}
-function setVal(path,v,pct){v=parseFloat(v); if(isNaN(v))return;
+function inp(label,path,val,unit,pct){
+ return `<div class="field"><label>${label}</label>
+ <input type="number" step="any" value="${val}"
+   oninput="setVal('${path}',this.value,${pct?1:0})"
+   inputmode="decimal"/>
+ <span class="edit-hint">✏️</span>
+ <div class="unit">${unit}</div></div>`;
+}
+function setVal(path,v,pct){
+ v=parseFloat(v); if(isNaN(v))return;
  if(pct)v=v/100;
- const[a,b]=path.split('.'); S[a][b]=v; save(); render();}
+ const[a,b]=path.split('.'); S[a][b]=v;
+ save(true);  /* BroadcastChannel으로 전파 */
+ render();
+ showToast('저장 · 전체 탭 동기화됨 ✓');
+}
 function fixedNote(key){
  if(key==='salary')return '근로소득 <b>월 1,000만원</b> (세후) · 2026~2027년 수령 후 종료. <br/>※ 고정 항목으로 직접 수정되지 않습니다.';
  if(key==='farm')return '농지연금 (감정평가액 15억) · 1기 <b>월 300만원</b> (2026~2036) → 2기 <b>월 220만원</b> (2037~종신). <br/>※ 제도 기준 고정 항목.';
@@ -334,10 +443,10 @@ function calcHTML(){
   <div class="card">
    <div class="panel-h"><div class="ttl"><span class="ico">🧮</span> 연도·나이 입력</div></div>
    <div class="field"><label>연도</label>
-     <input id="cY" type="number" min="${Y0}" max="${Y1}" value="2036" oninput="syncFromYear()"/>
+     <input id="cY" type="number" min="${Y0}" max="${Y1}" value="2036" oninput="syncFromYear()" inputmode="numeric"/>
      <div class="unit">${Y0} ~ ${Y1}</div></div>
    <div class="field"><label>나이 (만)</label>
-     <input id="cA" type="number" min="${Y0-BIRTH}" max="${Y1-BIRTH}" value="${2036-BIRTH}" oninput="syncFromAge()"/>
+     <input id="cA" type="number" min="${Y0-BIRTH}" max="${Y1-BIRTH}" value="${2036-BIRTH}" oninput="syncFromAge()" inputmode="numeric"/>
      <div class="unit">${Y0-BIRTH}세 ~ ${Y1-BIRTH}세 · 출생 ${BIRTH}년 기준</div></div>
    <input id="cR" type="range" min="${Y0}" max="${Y1}" value="2036" oninput="document.getElementById('cY').value=this.value;syncFromYear()"/>
   </div>
@@ -354,7 +463,14 @@ function calcHTML(){
    <div class="bars" id="oBars"></div>
  </div>`;
 }
-function initCalc(){syncFromYear();}
+function initCalc(){
+ syncFromYear();
+ /* calc 탭의 숫자 input에도 전체선택 */
+ document.querySelectorAll('#cY,#cA').forEach(el=>{
+  el.addEventListener('focus',_onFocus);
+  el.addEventListener('click',_onClick);
+ });
+}
 function syncFromYear(){let y=clamp(+document.getElementById('cY').value,Y0,Y1);
  document.getElementById('cA').value=y-BIRTH; document.getElementById('cR').value=y; calcOut(y);}
 function syncFromAge(){let a=clamp(+document.getElementById('cA').value,Y0-BIRTH,Y1-BIRTH);
@@ -371,7 +487,6 @@ function calcOut(y){
    <div class="tr"><div class="fl" style="width:${m/mx*100}%;background:linear-gradient(90deg,${o.color},${o.color}cc)"></div></div>
    <div class="vl">${fmt(m)}만</div></div>`;}).join('');
 }
-
 
 /* ===================== 자산구성표 ===================== */
 function assetHTML(){
@@ -403,6 +518,7 @@ function assetHTML(){
   <tr style="border-top:2px solid var(--gold)"><td><b>합계</b></td><td class="num"><b style="color:var(--gold-soft)">${fmt1(totalAsset)}</b></td><td class="num">100%</td><td></td><td></td></tr>
   </tbody></table></div>`;
 }
+
 /* ===================== 연도별 현금흐름 ===================== */
 function flowHTML(){
  const ys=years(), assets=assetSeries();
@@ -430,6 +546,7 @@ function flowHTML(){
    <div class="scrolltable"><table><thead><tr><th>연도</th><th>나이</th><th>월수입(만)</th><th>연수입(만)</th><th>월생활비</th><th>연 순현금</th><th>누적자산(억)</th></tr></thead>
    <tbody>${rows}</tbody></table></div></div>`;
 }
+
 /* ===================== 증여세 ===================== */
 function giftHTML(){
  return `<div class="grid cols-2" style="align-items:start">
@@ -510,6 +627,9 @@ function mountCharts(){
       y:{grid:{color:'rgba(35,69,110,.4)'},title:{display:true,text:'억원'}}}}}));
  }
 }
+
+/* ===================== INIT ===================== */
+initSync();
 render();
 </script>
 </body>
