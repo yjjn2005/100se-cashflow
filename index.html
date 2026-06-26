@@ -272,6 +272,27 @@ const fmt=n=>Math.round(n).toLocaleString('ko-KR');
 const fmt1=n=>(Math.round(n*10)/10).toLocaleString('ko-KR',{minimumFractionDigits:1,maximumFractionDigits:1});
 const eok=man=>fmt1(man/10000);
 
+
+/* renderLight: 입력 중 DOM 재생성 없이 차트/KPI만 갱신 */
+function renderLight(){
+ mountCharts();
+ // KPI 카드 숫자만 업데이트 (flow 탭)
+ if(cur==='flow'){
+  const ys=years(), assets=assetSeries();
+  const deficits=ys.filter(y=>netCashflow(y)<0).length;
+  const totNet=ys.reduce((s,y)=>s+netCashflow(y),0);
+  document.querySelectorAll('.kpi .val').forEach((el,i)=>{
+   if(i===0)el.innerHTML=eok(totNet)+'<small>억</small>';
+   if(i===1)el.innerHTML=fmt1(assets[Y1])+'<small>억</small>';
+   if(i===2)el.innerHTML=deficits+'<small>개년</small>';
+   if(i===3)el.innerHTML=fmt(S.living.active)+'<small>만</small>';
+  });
+ }
+ // sync 다른 탭에는 full render
+ if(window._bc){
+  try{ window._bc.postMessage({type:'update',data:S,ts:Date.now()}); }catch(e){}
+ }
+}
 /* ===================== TABS ===================== */
 const TABS=[{k:'dash',n:'대시보드',i:'📊'},{k:'asset',n:'자산구성표',i:'📦'},{k:'flow',n:'연도별 현금흐름',i:'📅'}]
  .concat(SRC.map(s=>({k:s.key,n:s.name,i:s.icon})))
@@ -416,7 +437,10 @@ function grp(arr){return `<div>${arr.join('')}</div>`;}
 function inp(label,path,val,unit,pct){
  return `<div class="field"><label>${label}</label>
  <input type="number" step="any" value="${val}"
-   oninput="setVal('${path}',this.value,${pct?1:0})"
+   data-path="${path}" data-pct="${pct?1:0}"
+   onchange="setVal('${path}',this.value,${pct?1:0})"
+   onblur="setVal('${path}',this.value,${pct?1:0})"
+   onkeydown="if(event.key==='Enter'){this.blur();}"
    inputmode="decimal"/>
  <span class="edit-hint">✏️</span>
  <div class="unit">${unit}</div></div>`;
@@ -424,10 +448,11 @@ function inp(label,path,val,unit,pct){
 function setVal(path,v,pct){
  v=parseFloat(v); if(isNaN(v))return;
  if(pct)v=v/100;
- const[a,b]=path.split('.'); S[a][b]=v;
- save(true);  /* BroadcastChannel으로 전파 */
- render();
- showToast('저장 · 전체 탭 동기화됨 ✓');
+ const[a,b]=path.split('.'); if(S[a][b]===v)return; // 값 미변경시 스킵
+ S[a][b]=v;
+ save(true);
+ renderLight(); // 차트·KPI만 갱신, input DOM 유지
+ showToast('저장 ✓');
 }
 function fixedNote(key){
  if(key==='salary')return '근로소득 <b>월 1,000만원</b> (세후) · 2026~2027년 수령 후 종료. <br/>※ 고정 항목으로 직접 수정되지 않습니다.';
