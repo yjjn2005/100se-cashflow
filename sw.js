@@ -1,7 +1,7 @@
 /* =====================================================
    Service Worker — 유재진 100세 캐시플로우 PWA
    ===================================================== */
-const CACHE = 'jjcf-v3';
+const CACHE = 'jjcf-v4';
 const CORE = [
   '/100se-cashflow/',
   '/100se-cashflow/index.html',
