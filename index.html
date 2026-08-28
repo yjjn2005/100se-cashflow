@@ -215,7 +215,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
  <div id="view"></div>
  <div class="foot">
   본 도구는 가정에 기반한 추정치이며 실제 수령액·세금·제도와 다를 수 있습니다. 투자·세무 결정은 전문가와 상담하세요.<br/>
-  © 2026 유재진 자산설계 · 농지·급여·국민·주택연금은 고정(공식) · IRP·법인배당·부동산임대·주식운용은 수동입력 또는 앱 연동(☁️ PIN 동기화)
+  © 2026 유재진 자산설계 · 전 항목(8종) 수정 가능 — 어느 기기에서 수정해도 모든 기기에 자동 반영(☁️ PIN 동기화) · IRP·법인배당·임대·주식은 앱 연동 지원
  </div>
 </div>
 <div id="toast"></div>
@@ -242,7 +242,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 const BIRTH=1966, Y0=2026, Y1=2066;
 const FIXED={salary:1000, salEnd:2027, farm1:300, farm1End:2036, farm2:220,
  npsBase:160, npsStart:2030, cpi:0.02, house:350, houseStart:2032};
+const F=()=>S.fixed||FIXED;
 const DEFAULTS={
+ fixed:{...FIXED},
  irp:{principal:80000,rate:0.04,amt:450,start:2027,end:2046,amt2:106,start2:2047,end2:2056,amt3:64,start3:2057,end3:2066},
  corp:{amt:180,start:2027,growth:0.03},
  rent:{amt:300},
@@ -260,7 +262,7 @@ const BC_KEY='jjcf_bc';
 
 function load(){
  try{const v=JSON.parse(localStorage.getItem(STORE_KEY));
-  if(v&&v.irp){ if(!v.link)v.link={irp:false,corp:false,rent:false,stock:false}; return v; }
+  if(v&&v.irp){ if(!v.link)v.link={irp:false,corp:false,rent:false,stock:false}; if(!v.fixed)v.fixed={...FIXED}; return v; }
  }catch(e){}
  return JSON.parse(JSON.stringify(DEFAULTS));
 }
@@ -384,7 +386,7 @@ async function cloudPull(silent=true){
   window.FEEDS=d.feeds||{};
   let changed=false;
   if(d.state&&d.state.irp&&(d.updatedAt||0)>(S._ts||0)){
-   S=d.state; if(!S.link)S.link={irp:false,corp:false,rent:false,stock:false};
+   S=d.state; if(!S.link)S.link={irp:false,corp:false,rent:false,stock:false}; if(!S.fixed)S.fixed={...FIXED};
    localStorage.setItem(STORE_KEY,JSON.stringify(S));
    changed=true;
   }
@@ -459,14 +461,14 @@ const SRC=[
 ];
 function monthly(key,y){
  switch(key){
-  case 'salary': return y<=FIXED.salEnd?FIXED.salary:0;
-  case 'farm':   return y<=FIXED.farm1End?FIXED.farm1:FIXED.farm2;
+  case 'salary': return y<=F().salEnd?F().salary:0;
+  case 'farm':   return y<=F().farm1End?F().farm1:F().farm2;
   case 'irp':    return (y>=S.irp.start&&y<=S.irp.end)?S.irp.amt:(y>=S.irp.start2&&y<=S.irp.end2)?S.irp.amt2:(y>=S.irp.start3&&y<=S.irp.end3)?S.irp.amt3:0;
   case 'corp':   return y>=S.corp.start?S.corp.amt*Math.pow(1+S.corp.growth,y-S.corp.start):0;
   case 'rent':   return S.rent.amt;
   case 'stock':  return y>=S.stock.start?S.stock.amt*Math.pow(1+S.stock.growth,y-S.stock.start):0;
-  case 'nps':    return y>=FIXED.npsStart?FIXED.npsBase*Math.pow(1+FIXED.cpi,y-FIXED.npsStart):0;
-  case 'house':  return y>=FIXED.houseStart?FIXED.house:0;
+  case 'nps':    return y>=F().npsStart?F().npsBase*Math.pow(1+F().cpi,y-F().npsStart):0;
+  case 'house':  return y>=F().houseStart?F().house:0;
  } return 0;
 }
 function livingFor(y){return (y-BIRTH)>=S.living.switchAge?S.living.late:S.living.active;}
@@ -476,7 +478,7 @@ function lifetime(key){return years().reduce((s,y)=>s+monthly(key,y)*12,0);}
 function lifetimeAll(){return SRC.reduce((s,o)=>s+lifetime(o.key),0);}
 function maxMonthly(){return Math.max(...years().map(totalMonthly));}
 function netCashflow(y){return totalMonthly(y)*12-livingFor(y)*12;}
-function npsAt(d,y){const start=2030+d; if(y<start)return 0; const b=160*(1+0.072*d); return b*Math.pow(1.02,y-start);}
+function npsAt(d,y){const start=F().npsStart+d; if(y<start)return 0; const b=F().npsBase*(1+0.072*d); return b*Math.pow(1+F().cpi,y-start);}
 function npsLifetime(d){let s=0;for(let y=2030+d;y<=Y1;y++)s+=npsAt(d,y)*12;return s;}
 const ASSETS=[{key:'house',name:'주택연금 (거주 아파트)',icon:'🔑',income:'house',note:'66세(2032)~종신 월350만 · 가입자격 사전확인'},
  {key:'rent',name:'임대부동산',icon:'🏠',income:300,note:'양도세 공제후 · 5인 공동사업자 총 1,100만 (본인 반영 월300만)'},
@@ -581,7 +583,7 @@ function dashHTML(){
  <div class="card"><table><thead><tr><th>수입원</th><th>구분</th><th>평생 총수령(억)</th><th>비중</th><th>최대 월수령(만)</th></tr></thead>
  <tbody>${rows.map(o=>{const mx=Math.max(...years().map(y=>monthly(o.key,y)));
    return `<tr><td><i class="dot" style="background:${o.color}"></i> ${o.name}</td>
-   <td style="text-align:left"><span class="badge ${o.fixed?'fix':'edit'}">${o.fixed?'고정':'수정가능'}</span></td>
+   <td style="text-align:left"><span class="badge ${o.fixed?'fix':'edit'}">${o.fixed?'공식':'앱연동'}</span></td>
    <td class="num">${eok(o.life)}</td><td class="num">${fmt1(o.life/lifeAll*100)}%</td>
    <td class="num">${fmt(mx)}</td></tr>`;}).join('')}
  <tr style="border-top:2px solid var(--gold)"><td><b>합계</b></td><td></td><td class="num"><b style="color:var(--gold-soft)">${eok(lifeAll)}</b></td><td class="num">100%</td><td></td></tr>
@@ -595,9 +597,8 @@ function srcHTML(key){
  const o=SRC.find(s=>s.key===key);
  const life=lifetime(key), mx=Math.max(...years().map(y=>monthly(key,y)));
  const startY=years().find(y=>monthly(key,y)>0)||'-';
- let ctrl;
- if(!o.fixed){ ctrl=editControls(key); }
- else{ ctrl=`<div class="readonly-note">${fixedNote(key)}</div>`; }
+ let ctrl=editControls(key);
+ if(o.fixed){ ctrl=`<div class="readonly-note" style="margin-bottom:12px">${fixedNote(key)}</div>`+ctrl; }
  const decs=[2026,2030,2036,2040,2046,2050,2056,2060,2066];
  const tbl=decs.map(y=>`<tr class="${(y-BIRTH)%10===0?'decade':''}"><td>${y}</td><td class="num">${y-BIRTH}세</td>
    <td class="num">${fmt(monthly(key,y))}</td><td class="num">${fmt(monthly(key,y)*12)}</td></tr>`).join('');
@@ -605,8 +606,8 @@ function srcHTML(key){
  ${o.fixed?'':feedPanel(key)}
  <div class="card">
   <div class="panel-h"><div class="ttl"><span class="ico">${o.icon}</span> ${o.name}
-   <span class="badge ${o.fixed?'fix':'edit'}">${o.fixed?'고정 (공식)':'수정 가능'}</span></div>
-   ${o.fixed?'':'<button class="reset" onclick="reset()">전체 기본값 복원</button>'}</div>
+   <span class="badge ${o.fixed?'fix':'edit'}">${o.fixed?'공식 · 수정 가능':'수정 가능 · 앱연동'}</span></div>
+   <button class="reset" onclick="reset()">전체 기본값 복원</button></div>
   <div class="grid cols-2" style="align-items:start">
    <div>${ctrl}</div>
    <div class="grid cols-3" style="grid-template-columns:1fr 1fr 1fr">
@@ -654,7 +655,7 @@ function irpBalancePanel(){
 }
 
 function npsDeferPanel(){
- const rows=[0,1,2,3,4,5].map(d=>({d,age:64+d,year:2030+d,m:160*(1+0.072*d),inc:(0.072*d*100),life:npsLifetime(d)}));
+ const rows=[0,1,2,3,4,5].map(d=>({d,age:(F().npsStart-BIRTH)+d,year:F().npsStart+d,m:F().npsBase*(1+0.072*d),inc:(0.072*d*100),life:npsLifetime(d)}));
  const best=5;
  return `<div class="sec-title">🛡️ 국민연금 연기 시뮬레이터 <span class="pill">연기할수록 +7.2%/년 · 종신 물가연동</span><span class="ln"></span></div>
  <div class="card"><table><thead><tr><th>연기</th><th>개시나이</th><th>개시연도</th><th>월수령(만)</th><th>증액률</th><th>100세까지 누계(억)</th><th>비고</th></tr></thead>
@@ -691,6 +692,20 @@ function editControls(key){
    inp('주식운용 월수입','stock.amt',S.stock.amt,'만/월'),
    inp('시작 연도','stock.start',S.stock.start,'년'),
    inp('연 증가율 (%)','stock.growth',+(S.stock.growth*100).toFixed(2),'%/년',true)]);
+ if(key==='salary')return grp([
+   inp('월 급여 (세후)','fixed.salary',F().salary,'만/월'),
+   inp('급여 종료연도','fixed.salEnd',F().salEnd,'년')]);
+ if(key==='farm')return grp([
+   inp('1기 월수령','fixed.farm1',F().farm1,'만/월'),
+   inp('1기 종료연도','fixed.farm1End',F().farm1End,'년'),
+   inp('2기 월수령 (종신)','fixed.farm2',F().farm2,'만/월')]);
+ if(key==='nps')return grp([
+   inp('기준 월수령','fixed.npsBase',F().npsBase,'만/월'),
+   inp('개시 연도','fixed.npsStart',F().npsStart,'년'),
+   inp('물가연동률 (%)','fixed.cpi',+(F().cpi*100).toFixed(1),'%/년',true)]);
+ if(key==='house')return grp([
+   inp('월 수령액','fixed.house',F().house,'만/월'),
+   inp('개시 연도','fixed.houseStart',F().houseStart,'년')]);
  return '';
 }
 function grp(arr){return `<div>${arr.join('')}</div>`;}
@@ -716,10 +731,10 @@ function setVal(path,v,pct){
  showToast('저장 ✓');
 }
 function fixedNote(key){
- if(key==='salary')return '근로소득 <b>월 1,000만원</b> (세후) · 2026~2027년 수령 후 종료. <br/>※ 고정 항목으로 직접 수정되지 않습니다.';
- if(key==='farm')return '농지연금 (감정평가액 15억) · 1기 <b>월 300만원</b> (2026~2036) → 2기 <b>월 220만원</b> (2037~종신). <br/>※ 제도 기준 고정 항목.';
- if(key==='nps')return `국민연금 기준 <b>월 160만원</b> · 2030년(64세) 개시 · 매년 물가 <b>2%</b> 연동. <br/>예) 2030 160만 → 2046 약 ${fmt(monthly('nps',2046))}만 → 2066 약 ${fmt(monthly('nps',2066))}만. <br/>※ 고정 항목.`;
- if(key==='house')return '주택연금 (거주 아파트 23억) · <b>66세(2032)부터 월 350만원 종신</b> 수령. <br/>※ 가입자격(공시가 12억 이하) 사전 확인 필요 · 고정 항목.';
+ if(key==='salary')return `근로소득 <b>월 ${fmt(F().salary)}만원</b> (세후) · ${F().salEnd}년 수령 후 종료. <br/>※ 공식 항목 — 아래에서 수정 시 모든 기기에 반영됩니다.`;
+ if(key==='farm')return `농지연금 (감정평가액 15억) · 1기 <b>월 ${fmt(F().farm1)}만원</b> (~${F().farm1End}) → 2기 <b>월 ${fmt(F().farm2)}만원</b> (${F().farm1End+1}~종신). <br/>※ 공식 항목 — 수정 시 모든 기기에 반영.`;
+ if(key==='nps')return `국민연금 기준 <b>월 ${fmt(F().npsBase)}만원</b> · ${F().npsStart}년(${F().npsStart-BIRTH}세) 개시 · 매년 물가 <b>${(F().cpi*100).toFixed(1)}%</b> 연동. <br/>예) ${F().npsStart} ${fmt(F().npsBase)}만 → 2046 약 ${fmt(monthly('nps',2046))}만 → 2066 약 ${fmt(monthly('nps',2066))}만. <br/>※ 공식 항목 — 수정 시 모든 기기에 반영.`;
+ if(key==='house')return `주택연금 (거주 아파트 23억) · <b>${F().houseStart-BIRTH}세(${F().houseStart})부터 월 ${fmt(F().house)}만원 종신</b> 수령. <br/>※ 가입자격(공시가 12억 이하) 사전 확인 필요 — 수정 시 모든 기기에 반영.`;
  return '';
 }
 
