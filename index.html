@@ -45,6 +45,33 @@ header{padding:26px 0 14px;display:flex;align-items:center;justify-content:space
 .sync-badge .dot-live{width:7px;height:7px;border-radius:50%;background:var(--green);
  animation:pulse 1.6s infinite}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+.sync-badge{cursor:pointer}
+.sync-badge.off{background:rgba(159,179,204,.12);color:var(--sub);border-color:rgba(159,179,204,.3)}
+.sync-badge.err{background:rgba(242,119,107,.14);color:var(--red);border-color:rgba(242,119,107,.4)}
+/* Cloud modal */
+.cmodal{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;
+ background:rgba(4,10,20,.72);backdrop-filter:blur(4px);padding:18px}
+.cmodal .box{width:100%;max-width:430px;background:linear-gradient(160deg,var(--panel),var(--panel2));
+ border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+.cmodal h3{font-size:16px;color:var(--gold-soft);margin-bottom:4px}
+.cmodal .desc{font-size:12px;color:var(--sub);line-height:1.7;margin-bottom:14px}
+.cmodal label{display:block;font-size:12px;color:var(--sub);margin:10px 0 5px}
+.cmodal input{width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--line);
+ background:var(--navy2);color:var(--ink);font-size:14px}
+.cmodal .btns{display:flex;gap:8px;margin-top:18px}
+.cmodal button{flex:1;padding:11px;border-radius:10px;border:none;font-weight:700;font-size:13px;cursor:pointer}
+.cmodal .primary{background:linear-gradient(145deg,var(--gold),#9d7c25);color:#241a00}
+.cmodal .ghost{background:transparent;border:1px solid var(--line);color:var(--sub)}
+.cmodal .stat{font-size:12px;margin-top:12px;min-height:16px;color:var(--sub)}
+/* Feed card */
+.card.feed{border-color:rgba(111,168,255,.35);background:linear-gradient(160deg,rgba(111,168,255,.08),var(--panel2))}
+.feed-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.feed-ico{font-size:20px}
+.feed-sub{font-size:11px;color:var(--sub);margin-top:2px}
+.feed-vals{font-size:12px;color:var(--gold-soft);margin-top:6px;line-height:1.7}
+.feed-auto{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--sub);cursor:pointer;white-space:nowrap}
+.feed-btn{padding:8px 14px;border-radius:9px;border:none;background:rgba(111,168,255,.2);
+ color:var(--blue);font-weight:700;font-size:12px;cursor:pointer;border:1px solid rgba(111,168,255,.4)}
 /* Tabs */
 nav{display:flex;gap:7px;overflow-x:auto;padding:8px 0 14px;scrollbar-width:thin;position:sticky;top:0;z-index:20;
  background:linear-gradient(var(--navy),rgba(8,22,39,.86));backdrop-filter:blur(6px)}
@@ -181,17 +208,35 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   </div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
    <div class="asof">기준일 <b>2026.06.26</b>&nbsp; 단위 만원/월 (세후)</div>
-   <div class="sync-badge" id="syncBadge"><span class="dot-live"></span><span id="syncTxt">실시간 동기화 ON</span></div>
+   <div class="sync-badge" id="syncBadge" onclick="openCloud()" title="기기 간 클라우드 동기화 설정"><span class="dot-live"></span><span id="syncTxt">실시간 동기화 ON</span></div>
   </div>
  </header>
  <nav id="nav"></nav>
  <div id="view"></div>
  <div class="foot">
   본 도구는 가정에 기반한 추정치이며 실제 수령액·세금·제도와 다를 수 있습니다. 투자·세무 결정은 전문가와 상담하세요.<br/>
-  © 2026 유재진 자산설계 · 농지·급여·국민·주택연금은 고정(공식), IRP·법인배당·부동산임대·주식운용은 수동입력
+  © 2026 유재진 자산설계 · 농지·급여·국민·주택연금은 고정(공식) · IRP·법인배당·부동산임대·주식운용은 수동입력 또는 앱 연동(☁️ PIN 동기화)
  </div>
 </div>
 <div id="toast"></div>
+
+<div id="cloudModal" class="cmodal" style="display:none" onclick="if(event.target===this)closeCloud()">
+ <div class="box">
+  <h3>☁️ 모든 기기 연동 설정</h3>
+  <div class="desc">Cloudflare 서버(KV)로 모든 기기에서 데이터가 동기화됩니다.
+   같은 PIN을 입력한 기기끼리 연결되며, 다른 앱(임대·법인배당·IRP)에서 내보낸 데이터도 같은 PIN으로 수신합니다.</div>
+  <label>서버 주소</label>
+  <input id="cmApi" type="url" placeholder="https://cashflow-hub-api.yjjn2005.workers.dev"/>
+  <label>동기화 PIN (4자리 이상)</label>
+  <input id="cmPin" type="text" inputmode="numeric" placeholder="예: 5930 — 모든 기기에 동일 입력"/>
+  <div class="stat" id="cmStat"></div>
+  <div class="btns">
+   <button class="ghost" onclick="closeCloud()">닫기</button>
+   <button class="ghost" onclick="cloudTest()">연결 테스트</button>
+   <button class="primary" onclick="cloudSave()">저장 후 동기화</button>
+  </div>
+ </div>
+</div>
 <script>
 /* ===================== MODEL ===================== */
 const BIRTH=1966, Y0=2026, Y1=2066;
@@ -204,7 +249,8 @@ const DEFAULTS={
  stock:{amt:200,start:2030,growth:0},
  living:{active:1200,late:900,switchAge:85},
  assets:{house:23,rent:25,farm:15,irp:8,corp:10,stock:10},
- npsDefer:0
+ npsDefer:0,
+ link:{irp:false,corp:false,rent:false,stock:false}
 };
 let S=load();
 
@@ -213,14 +259,18 @@ const STORE_KEY='jjcf';
 const BC_KEY='jjcf_bc';
 
 function load(){
- try{const v=JSON.parse(localStorage.getItem(STORE_KEY));if(v&&v.irp)return v;}catch(e){}
+ try{const v=JSON.parse(localStorage.getItem(STORE_KEY));
+  if(v&&v.irp){ if(!v.link)v.link={irp:false,corp:false,rent:false,stock:false}; return v; }
+ }catch(e){}
  return JSON.parse(JSON.stringify(DEFAULTS));
 }
 function save(broadcast=true){
+ S._ts=Date.now();
  localStorage.setItem(STORE_KEY,JSON.stringify(S));
  if(broadcast && window._bc){
-  try{ window._bc.postMessage({type:'update',data:S,ts:Date.now()}); }catch(e){}
+  try{ window._bc.postMessage({type:'update',data:S,ts:S._ts}); }catch(e){}
  }
+ scheduleCloudPush();
 }
 function reset(){S=JSON.parse(JSON.stringify(DEFAULTS));save();render();showToast('기본값으로 복원됐습니다');}
 
@@ -260,6 +310,140 @@ function showToast(msg,dur=2200){
  const el=document.getElementById('toast');
  el.textContent=msg; el.classList.add('show');
  setTimeout(()=>el.classList.remove('show'),dur);
+}
+
+/* ===================== CLOUD SYNC (Cloudflare Worker + KV, PIN) ===================== */
+const HUB_API_DEFAULT='https://cashflow-hub-api.yjjn2005.workers.dev';
+const CFG_API='jjcf_api', CFG_PIN='jjcf_pin';
+window.FEEDS={};
+let _pushT=null,_pullT=null,_pushing=false;
+
+function hubApi(){return (localStorage.getItem(CFG_API)||HUB_API_DEFAULT).replace(/\/+$/,'');}
+function hubPin(){return localStorage.getItem(CFG_PIN)||'';}
+function setBadge(txt,cls){
+ const b=document.getElementById('syncBadge'),t=document.getElementById('syncTxt');
+ if(!b)return; b.classList.remove('off','err');
+ if(cls)b.classList.add(cls); t.textContent=txt;
+}
+
+function openCloud(){
+ document.getElementById('cmApi').value=hubApi();
+ document.getElementById('cmPin').value=hubPin();
+ document.getElementById('cmStat').textContent='';
+ document.getElementById('cloudModal').style.display='flex';
+}
+function closeCloud(){document.getElementById('cloudModal').style.display='none';}
+async function cloudTest(){
+ const api=document.getElementById('cmApi').value.trim().replace(/\/+$/,'');
+ const pin=document.getElementById('cmPin').value.trim();
+ const st=document.getElementById('cmStat');
+ if(!pin){st.textContent='PIN을 입력하세요';return;}
+ st.textContent='연결 확인 중…';
+ try{
+  const r=await fetch(api+'/sync/'+encodeURIComponent(pin),{cache:'no-store'});
+  if(!r.ok)throw new Error(r.status);
+  const d=await r.json();
+  st.innerHTML=d.state
+   ?'✅ 연결 성공 — 서버에 저장된 데이터 있음 (마지막 갱신 '+new Date(d.updatedAt).toLocaleString('ko-KR')+')'
+   :'✅ 연결 성공 — 이 PIN의 첫 기기입니다';
+ }catch(e){st.textContent='❌ 연결 실패 — 서버 주소/배포 상태를 확인하세요';}
+}
+function cloudSave(){
+ const api=document.getElementById('cmApi').value.trim().replace(/\/+$/,'');
+ const pin=document.getElementById('cmPin').value.trim();
+ if(!pin||pin.length<4){document.getElementById('cmStat').textContent='PIN은 4자리 이상이어야 합니다';return;}
+ localStorage.setItem(CFG_API,api||HUB_API_DEFAULT);
+ localStorage.setItem(CFG_PIN,pin);
+ closeCloud(); showToast('☁️ 클라우드 동기화가 설정됐습니다');
+ cloudInit(true);
+}
+
+function scheduleCloudPush(){
+ if(!hubPin())return;
+ clearTimeout(_pushT);
+ _pushT=setTimeout(cloudPush,1200);
+}
+async function cloudPush(){
+ if(!hubPin()||_pushing)return;
+ _pushing=true; setBadge('클라우드 저장 중…');
+ try{
+  const r=await fetch(hubApi()+'/sync/'+encodeURIComponent(hubPin()),{
+   method:'PUT',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({state:S,ts:S._ts||Date.now()})});
+  if(!r.ok)throw new Error(r.status);
+  setBadge('☁️ 모든 기기 동기화 ON');
+ }catch(e){setBadge('동기화 오류 — 탭하여 확인','err');}
+ _pushing=false;
+}
+async function cloudPull(silent=true){
+ if(!hubPin())return;
+ try{
+  const r=await fetch(hubApi()+'/sync/'+encodeURIComponent(hubPin()),{cache:'no-store'});
+  if(!r.ok)throw new Error(r.status);
+  const d=await r.json();
+  window.FEEDS=d.feeds||{};
+  let changed=false;
+  if(d.state&&d.state.irp&&(d.updatedAt||0)>(S._ts||0)){
+   S=d.state; if(!S.link)S.link={irp:false,corp:false,rent:false,stock:false};
+   localStorage.setItem(STORE_KEY,JSON.stringify(S));
+   changed=true;
+  }
+  // 자동적용 켜진 항목은 피드 수신 즉시 반영
+  for(const k of ['irp','corp','rent','stock']){
+   if(S.link&&S.link[k]&&window.FEEDS[k]&&(window.FEEDS[k].ts||0)>(S.link[k+'Ts']||0)){
+    if(applyFeed(k,false))changed=true;
+   }
+  }
+  setBadge('☁️ 모든 기기 동기화 ON');
+  if(changed){flashSync();render();}
+  else if(!silent)render();
+ }catch(e){setBadge('동기화 오류 — 탭하여 확인','err');}
+}
+function cloudInit(first=false){
+ clearInterval(_pullT);
+ if(!hubPin()){setBadge('☁️ 탭하여 기기연동 설정','off');return;}
+ cloudPull(!first).then(()=>{if(first)cloudPush();});
+ _pullT=setInterval(()=>cloudPull(true),30000);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)cloudPull(true);});
+}
+
+/* ---------- 앱간 연동 피드 ---------- */
+const FEED_SRC={irp:'pension-portfolio',corp:'corp-etf-sim',rent:'yjj-realestate',stock:'stock-tool'};
+function toggleLink(key,on){
+ S.link[key]=on; save(true);
+ if(on&&window.FEEDS[key])applyFeed(key,true);
+ else showToast(on?'자동적용 ON':'자동적용 OFF — 수동값 유지');
+}
+function applyFeed(key,manual){
+ const f=window.FEEDS[key]; if(!f)return false;
+ let applied=false;
+ for(const[k,v]of Object.entries(f)){
+  if(k==='ts'||k==='src')continue;
+  if(S[key]&&S[key][k]!==undefined&&typeof v==='number'&&S[key][k]!==v){S[key][k]=v;applied=true;}
+ }
+ S.link[key+'Ts']=f.ts||Date.now();
+ if(applied){save(true);if(manual){render();showToast('🔗 연동 데이터가 적용됐습니다');}}
+ else if(manual)showToast('이미 최신 값입니다');
+ return applied;
+}
+function feedPanel(key){
+ const f=window.FEEDS[key];
+ const linked=S.link&&S.link[key];
+ if(!f)return `<div class="card feed"><div class="feed-row"><span class="feed-ico">🔗</span>
+  <div style="flex:1"><b>앱 연동 대기</b>
+   <div class="feed-sub">${FEED_SRC[key]}에서 "캐시플로우로 내보내기" 실행 시 여기에 표시됩니다 · 동일 PIN 필요</div></div>
+  <label class="feed-auto"><input type="checkbox" ${linked?'checked':''} onchange="toggleLink('${key}',this.checked)"/>자동적용</label>
+ </div></div>`;
+ const when=new Date(f.ts).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+ const UNITS={amt:'만/월',amt2:'만/월',amt3:'만/월',principal:'만',start:'년',end:'년',growth:'',rate:''};
+ const LBL={amt:'월액',amt2:'2구간',amt3:'3구간',principal:'원금',rate:'수익률',start:'시작',end:'종료',growth:'증가율'};
+ const vals=Object.entries(f).filter(([k])=>k!=='ts'&&k!=='src').map(([k,v])=>
+  `${LBL[k]||k} <b>${(k==='growth'||k==='rate')?(v*100).toFixed(1)+'%':fmt(v)}${UNITS[k]||''}</b>`).join(' · ');
+ return `<div class="card feed"><div class="feed-row"><span class="feed-ico">🔗</span>
+  <div style="flex:1"><b>연동 데이터 수신</b> <span class="feed-sub">${f.src||FEED_SRC[key]} · ${when}</span>
+   <div class="feed-vals">${vals}</div></div>
+  <label class="feed-auto"><input type="checkbox" ${linked?'checked':''} onchange="toggleLink('${key}',this.checked)"/>자동적용</label>
+  <button class="feed-btn" onclick="applyFeed('${key}',true)">지금 적용</button></div></div>`;
 }
 
 /* ===================== DATA ===================== */
@@ -418,6 +602,7 @@ function srcHTML(key){
  const tbl=decs.map(y=>`<tr class="${(y-BIRTH)%10===0?'decade':''}"><td>${y}</td><td class="num">${y-BIRTH}세</td>
    <td class="num">${fmt(monthly(key,y))}</td><td class="num">${fmt(monthly(key,y)*12)}</td></tr>`).join('');
  return `
+ ${o.fixed?'':feedPanel(key)}
  <div class="card">
   <div class="panel-h"><div class="ttl"><span class="ico">${o.icon}</span> ${o.name}
    <span class="badge ${o.fixed?'fix':'edit'}">${o.fixed?'고정 (공식)':'수정 가능'}</span></div>
@@ -790,6 +975,7 @@ window.addEventListener('hashchange',applyHash);
 initSync();
 render();
 applyHash();
+cloudInit();
 </script>
 </body>
 </html>
