@@ -241,16 +241,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 /* ===================== MODEL ===================== */
 const BIRTH=1966, Y0=2026, Y1=2066;
 const FIXED={salary:1000, salEnd:2027, farm1:300, farm1End:2036, farm2:220,
- npsBase:160, npsStart:2030, cpi:0.02, house:350, houseStart:2032};
+ npsBase:160, npsStart:2030, cpi:0.02, house:350, houseStart:2032, farmAppraisal:120000};
 const F=()=>S.fixed||FIXED;
 const DEFAULTS={
  fixed:{...FIXED},
- irp:{principal:80000,rate:0.04,amt:450,start:2027,end:2046,amt2:106,start2:2047,end2:2056,amt3:64,start3:2057,end3:2066},
- corp:{amt:180,start:2027,growth:0.03},
+  irp:{principal:60000,rate:0.04,amt:450,start:2027,end:2046,amt2:106,start2:2047,end2:2056,amt3:64,start3:2057,end3:2066},
+ corp:{amt:180,start:2027,growth:0.03,principal:180000},
  rent:{amt:300},
- stock:{amt:200,start:2030,growth:0},
+ stock:{amt:200,start:2030,growth:0,principal:20000},
  living:{active:1200,late:900,switchAge:85},
- assets:{house:23,rent:25,farm:15,irp:8,corp:10,stock:10},
+ assets:{house:23,rent:25,farm:12,irp:6,corp:18,stock:2},
+ _v4:1,
  npsDefer:0,
  link:{irp:false,corp:false,rent:false,stock:false}
 };
@@ -260,9 +261,21 @@ let S=load();
 const STORE_KEY='jjcf';
 const BC_KEY='jjcf_bc';
 
+function migrate(v){
+ if(!v.link)v.link={irp:false,corp:false,rent:false,stock:false};
+ if(!v.fixed)v.fixed={...FIXED};
+ if(v.fixed.farmAppraisal===undefined)v.fixed.farmAppraisal=FIXED.farmAppraisal;
+ if(v.corp.principal===undefined)v.corp.principal=180000;
+ if(v.stock.principal===undefined)v.stock.principal=20000;
+ if(!v._v4){ /* 2026-08-28 요청값 1회 일괄 적용 */
+  v.irp.principal=60000; v.fixed.farmAppraisal=120000;
+  v.corp.principal=180000; v.stock.principal=20000; v._v4=1;
+ }
+ return v;
+}
 function load(){
  try{const v=JSON.parse(localStorage.getItem(STORE_KEY));
-  if(v&&v.irp){ if(!v.link)v.link={irp:false,corp:false,rent:false,stock:false}; if(!v.fixed)v.fixed={...FIXED}; return v; }
+  if(v&&v.irp)return migrate(v);
  }catch(e){}
  return JSON.parse(JSON.stringify(DEFAULTS));
 }
@@ -386,7 +399,7 @@ async function cloudPull(silent=true){
   window.FEEDS=d.feeds||{};
   let changed=false;
   if(d.state&&d.state.irp&&(d.updatedAt||0)>(S._ts||0)){
-   S=d.state; if(!S.link)S.link={irp:false,corp:false,rent:false,stock:false}; if(!S.fixed)S.fixed={...FIXED};
+   S=migrate(d.state);
    localStorage.setItem(STORE_KEY,JSON.stringify(S));
    changed=true;
   }
@@ -480,12 +493,21 @@ function maxMonthly(){return Math.max(...years().map(totalMonthly));}
 function netCashflow(y){return totalMonthly(y)*12-livingFor(y)*12;}
 function npsAt(d,y){const start=F().npsStart+d; if(y<start)return 0; const b=F().npsBase*(1+0.072*d); return b*Math.pow(1+F().cpi,y-start);}
 function npsLifetime(d){let s=0;for(let y=2030+d;y<=Y1;y++)s+=npsAt(d,y)*12;return s;}
-const ASSETS=[{key:'house',name:'주택연금 (거주 아파트)',icon:'🔑',income:'house',note:'66세(2032)~종신 월350만 · 가입자격 사전확인'},
- {key:'rent',name:'임대부동산',icon:'🏠',income:300,note:'양도세 공제후 · 5인 공동사업자 총 1,100만 (본인 반영 월300만)'},
- {key:'farm',name:'농지연금 부동산',icon:'🌾',income:'farm',note:'감정평가액 · 1기 300만→2기 220만'},
- {key:'irp',name:'IRP 연금',icon:'🏦',income:'irp',note:'원금 8억·연4% · 61~80세 450만(고정) → 81~90세 106만 → 91~100세 64만 · 100세 소진'},
- {key:'corp',name:'법인자금',icon:'🏛️',income:'corp',note:'SCHD 배당 원천 · 법인배당 180만~ 3%증액'},
- {key:'stock',name:'주식 운용',icon:'📈',income:'stock',note:'10억 운용 = 월 200만 (정액)'}];
+const ASSETS=[{key:'house',name:'주택연금 (거주 아파트)',icon:'🔑',income:'house'},
+ {key:'rent',name:'임대부동산',icon:'🏠',income:300},
+ {key:'farm',name:'농지연금 부동산',icon:'🌾',income:'farm'},
+ {key:'irp',name:'IRP 연금',icon:'🏦',income:'irp'},
+ {key:'corp',name:'법인자금',icon:'🏛️',income:'corp'},
+ {key:'stock',name:'주식 운용',icon:'📈',income:'stock'}];
+function assetNote(key){
+ if(key==='house')return `${F().houseStart-BIRTH}세(${F().houseStart})~종신 월${fmt(F().house)}만 · 가입자격 사전확인`;
+ if(key==='rent')return '양도세 공제후 · 5인 공동사업자 (본인 반영 월'+fmt(S.rent.amt)+'만)';
+ if(key==='farm')return `감정평가액 ${fmt1(F().farmAppraisal/10000)}억 · 1기 ${fmt(F().farm1)}만→2기 ${fmt(F().farm2)}만`;
+ if(key==='irp')return `원금 ${fmt1(S.irp.principal/10000)}억·연${(S.irp.rate*100).toFixed(1)}% · ${fmt(S.irp.amt)}만→${fmt(S.irp.amt2)}만→${fmt(S.irp.amt3)}만 · 100세 소진`;
+ if(key==='corp')return `투자원금 ${fmt1((S.corp.principal||0)/10000)}억 · 배당 ${fmt(S.corp.amt)}만~ ${(S.corp.growth*100).toFixed(0)}%증액`;
+ if(key==='stock')return `운용원금 ${fmt1((S.stock.principal||0)/10000)}억 = 월 ${fmt(S.stock.amt)}만`;
+ return '';
+}
 function assetSeries(){let r=23.5;const out={};for(const y of years()){
  const inc=totalMonthly(y)*12; const net=inc-livingFor(y)*12;
  r=r*1.03+net/10000; out[y]=r;} return out;}
@@ -683,12 +705,14 @@ function editControls(key){
   +'</div>';
 }
  if(key==='corp')return grp([
+   inp('법인 투자원금','corp.principal',S.corp.principal,'만원 · 자산구성표 연동'),
    inp('법인배당 시작액','corp.amt',S.corp.amt,'만/월'),
    inp('시작 연도','corp.start',S.corp.start,'년'),
    inp('연 증가율 (%)','corp.growth',+(S.corp.growth*100).toFixed(2),'%/년',true)]);
  if(key==='rent')return grp([
    inp('부동산 임대수입 월액','rent.amt',S.rent.amt,'만/월 · 전기간 정액')]);
  if(key==='stock')return grp([
+   inp('운용원금','stock.principal',S.stock.principal,'만원 · 자산구성표 연동'),
    inp('주식운용 월수입','stock.amt',S.stock.amt,'만/월'),
    inp('시작 연도','stock.start',S.stock.start,'년'),
    inp('연 증가율 (%)','stock.growth',+(S.stock.growth*100).toFixed(2),'%/년',true)]);
@@ -696,6 +720,7 @@ function editControls(key){
    inp('월 급여 (세후)','fixed.salary',F().salary,'만/월'),
    inp('급여 종료연도','fixed.salEnd',F().salEnd,'년')]);
  if(key==='farm')return grp([
+   inp('감정평가액','fixed.farmAppraisal',F().farmAppraisal,'만원 · 자산구성표 연동'),
    inp('1기 월수령','fixed.farm1',F().farm1,'만/월'),
    inp('1기 종료연도','fixed.farm1End',F().farm1End,'년'),
    inp('2기 월수령 (종신)','fixed.farm2',F().farm2,'만/월')]);
@@ -709,6 +734,12 @@ function editControls(key){
  return '';
 }
 function grp(arr){return `<div>${arr.join('')}</div>`;}
+function roAsset(label,val,hint,tab){
+ return `<div class="field" style="cursor:pointer" onclick="go('${tab}')" title="탭으로 이동해 수정">
+ <label>${label} <span style="color:var(--blue);font-size:10px">🔗 연동</span></label>
+ <input type="text" value="${fmt1(val)}" readonly style="opacity:.85;cursor:pointer"/>
+ <div class="unit">억 · ${hint}</div></div>`;
+}
 function inp(label,path,val,unit,pct){
  return `<div class="field"><label>${label}</label>
  <input type="number" step="any" value="${val}"
@@ -732,9 +763,9 @@ function setVal(path,v,pct){
 }
 function fixedNote(key){
  if(key==='salary')return `근로소득 <b>월 ${fmt(F().salary)}만원</b> (세후) · ${F().salEnd}년 수령 후 종료. <br/>※ 공식 항목 — 아래에서 수정 시 모든 기기에 반영됩니다.`;
- if(key==='farm')return `농지연금 (감정평가액 15억) · 1기 <b>월 ${fmt(F().farm1)}만원</b> (~${F().farm1End}) → 2기 <b>월 ${fmt(F().farm2)}만원</b> (${F().farm1End+1}~종신). <br/>※ 공식 항목 — 수정 시 모든 기기에 반영.`;
+ if(key==='farm')return `농지연금 (감정평가액 ${fmt1(F().farmAppraisal/10000)}억) · 1기 <b>월 ${fmt(F().farm1)}만원</b> (~${F().farm1End}) → 2기 <b>월 ${fmt(F().farm2)}만원</b> (${F().farm1End+1}~종신). <br/>※ 공식 항목 — 수정 시 모든 기기에 반영.`;
  if(key==='nps')return `국민연금 기준 <b>월 ${fmt(F().npsBase)}만원</b> · ${F().npsStart}년(${F().npsStart-BIRTH}세) 개시 · 매년 물가 <b>${(F().cpi*100).toFixed(1)}%</b> 연동. <br/>예) ${F().npsStart} ${fmt(F().npsBase)}만 → 2046 약 ${fmt(monthly('nps',2046))}만 → 2066 약 ${fmt(monthly('nps',2066))}만. <br/>※ 공식 항목 — 수정 시 모든 기기에 반영.`;
- if(key==='house')return `주택연금 (거주 아파트 23억) · <b>${F().houseStart-BIRTH}세(${F().houseStart})부터 월 ${fmt(F().house)}만원 종신</b> 수령. <br/>※ 가입자격(공시가 12억 이하) 사전 확인 필요 — 수정 시 모든 기기에 반영.`;
+ if(key==='house')return `주택연금 (거주 아파트 ${fmt1(S.assets.house)}억) · <b>${F().houseStart-BIRTH}세(${F().houseStart})부터 월 ${fmt(F().house)}만원 종신</b> 수령. <br/>※ 가입자격(공시가 12억 이하) 사전 확인 필요 — 수정 시 모든 기기에 반영.`;
  return '';
 }
 
@@ -789,11 +820,15 @@ function calcOut(y){
    <div class="vl">${fmt(m)}만</div></div>`;}).join('');
 }
 
+/* 파생 자산뷰(억): 각 탭 원금과 자동 연동 */
+function AV(){return {house:S.assets.house, rent:S.assets.rent,
+ farm:F().farmAppraisal/10000, irp:S.irp.principal/10000,
+ corp:(S.corp.principal||0)/10000, stock:(S.stock.principal||0)/10000};}
 /* ===================== 자산구성표 ===================== */
 function assetHTML(){
- const totalAsset=Object.values(S.assets).reduce((a,b)=>a+b,0);
- const re=ASSETS.map(a=>({...a,val:S.assets[a.key],inc:(typeof a.income==='number'?a.income:monthly(a.income,2040))}));
- const realestate=S.assets.house+S.assets.rent+S.assets.farm, fin=S.assets.irp+S.assets.corp+S.assets.stock;
+ const AVv=AV(); const totalAsset=Object.values(AVv).reduce((a,b)=>a+b,0);
+ const re=ASSETS.map(a=>({...a,val:AVv[a.key],note:assetNote(a.key),inc:(typeof a.income==='number'?a.income:monthly(a.income,2040))}));
+ const realestate=AVv.house+AVv.rent+AVv.farm, fin=AVv.irp+AVv.corp+AVv.stock;
  return `<div class="card">
   <div class="panel-h"><div class="ttl"><span class="ico">📦</span> 자산 구성표 <span class="badge edit">평가액 수정가능</span></div>
    <button class="reset" onclick="reset()">기본값 복원</button></div>
@@ -807,10 +842,10 @@ function assetHTML(){
   <div class="card"><div class="panel-h"><div class="ttl">✏️ 평가액 입력 (억)</div></div>
    ${inp('주택연금 아파트','assets.house',S.assets.house,'억')}
    ${inp('임대부동산','assets.rent',S.assets.rent,'억')}
-   ${inp('농지연금 부동산','assets.farm',S.assets.farm,'억')}
-   ${inp('IRP 연금','assets.irp',S.assets.irp,'억')}
-   ${inp('법인자금','assets.corp',S.assets.corp,'억')}
-   ${inp('주식 운용','assets.stock',S.assets.stock,'억')}</div>
+   ${roAsset('농지연금 부동산',AVv.farm,'농지연금 탭 감정평가액 연동','farm')}
+   ${roAsset('IRP 연금',AVv.irp,'IRP연금 탭 원금 연동','irp')}
+   ${roAsset('법인자금',AVv.corp,'법인배당 탭 투자원금 연동','corp')}
+   ${roAsset('주식 운용',AVv.stock,'주식운용 탭 운용원금 연동','stock')}</div>
  </div>
  <div class="card"><div class="panel-h"><div class="ttl">📋 자산·수입 종합</div></div>
   <table><thead><tr><th>구분</th><th>평가액(억)</th><th>비중</th><th>월수입(만)</th><th>비고</th></tr></thead><tbody>
@@ -918,7 +953,7 @@ function mountCharts(){
     options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:9}},
       y:{grid:{color:'rgba(35,69,110,.4)'},title:{display:true,text:'만원/월'}}}}}));
  } else if(cur==='asset'){
-  const re=ASSETS.map(a=>({...a,val:S.assets[a.key]}));
+  const re=ASSETS.map(a=>({...a,val:AV()[a.key]}));
   const cols=['#F2B36B','#E0A96D','#7FB77E','#6FA8FF','#C9A24B','#B98FE0'];
   charts.push(new Chart(cAsset,{type:'doughnut',data:{labels:re.map(a=>a.name),
     datasets:[{data:re.map(a=>a.val),backgroundColor:cols,borderColor:'#0c2138',borderWidth:2}]},
